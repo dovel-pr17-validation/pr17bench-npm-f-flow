@@ -1,0 +1,127 @@
+import { inject, Injectable } from '@angular/core';
+import { DropToGroupPreparationRequest } from './drop-to-group-preparation-request';
+import { FMediator, IExecution } from '../../../_libs/f-mediator';
+import { FComponentsStore } from '../../../f-storage';
+import { INodeWithRect } from '../../domain';
+import {
+  GetChildNodeIdsRequest,
+  GetNormalizedElementRectRequest,
+  GetParentNodesRequest,
+} from '../../../domain';
+import { findNodeOrGroupContaining, FGroupDirective, FNodeBase } from '../../../f-node';
+import { FDraggableDataContext } from '../../f-draggable-data-context';
+import { DropToGroupHandler } from '../drop-to-group-handler';
+import { DragNodeHandler } from '../../drag-node';
+import { SortDropCandidatesByLayerRequest } from '../sort-drop-candidates-by-layer';
+import { DragHandlerInjector } from '../../infrastructure';
+import { DragExternalItemHandler } from '../../drag-external-item';
+
+@Injectable()
+export class DropToGroupPreparation implements IExecution<DropToGroupPreparationRequest, void> {
+  private readonly _mediator = inject(FMediator);
+  private readonly _dragContext = inject(FDraggableDataContext);
+  private readonly _store = inject(FComponentsStore);
+  private readonly _dragInjector = inject(DragHandlerInjector);
+
+  private get _allNodes(): FNodeBase[] {
+    return this._store.nodes.getAll();
+  }
+
+  public handle({ event }: DropToGroupPreparationRequest): void {
+    if (!this._canPrepare()) {
+      return;
+    }
+
+    // Drop-to-group can be switched off (`fDropToGroup` = false). We still
+    // register the handler — the external-item finalize asks it for a target
+    // container and throws if none exists — but with no candidates it never
+    // activates a target, so nothing is reparented and no highlight appears.
+    if (!this._isDropToGroupEnabled()) {
+      const handler = this._dragInjector.get(DropToGroupHandler);
+      handler.initialize([]);
+
+      this._dragContext.draggableItems.push(handler);
+
+      return;
+    }
+
+    const dragTargetNode = findNodeOrGroupContaining(this._store, event.targetElement);
+
+    // If this is not an external drag and we can't resolve a target node — it's an invalid state.
+    if (!dragTargetNode && !this._hasExternalDrag()) {
+      throw new Error('Drag target node not found');
+    }
+
+    let targets = this._sortedTargetsForDrop();
+
+    // We can drop items only to children of direct parent (if target is inside some parent).
+    if (dragTargetNode) {
+      const parentId = dragTargetNode.fParentId();
+      const allowedIds = this._mediator.execute(new GetChildNodeIdsRequest(parentId));
+
+      if (allowedIds.length) {
+        targets = targets.filter((t) => allowedIds.includes(t.node.fId()));
+      }
+    }
+
+    const handler = this._dragInjector.get(DropToGroupHandler);
+    handler.initialize(targets);
+
+    this._dragContext.draggableItems.push(handler);
+  }
+
+  private _isDropToGroupEnabled(): boolean {
+    return this._store.fDraggable?.dropToGroup() !== false;
+  }
+
+  private _canPrepare(): boolean {
+    return this._hasMoveDrag() || this._hasExternalDrag();
+  }
+
+  private _hasMoveDrag(): boolean {
+    return this._dragContext.draggableItems.some((x) => x instanceof DragNodeHandler);
+  }
+
+  private _hasExternalDrag(): boolean {
+    return this._dragContext.draggableItems.some((x) => x instanceof DragExternalItemHandler);
+  }
+
+  private _sortedTargetsForDrop(): INodeWithRect[] {
+    const dragged = this._getDraggedNodes();
+    const draggingGroup = dragged.some((x) => x instanceof FGroupDirective);
+
+    const draggedWithParents = this._withParents(dragged);
+    const eligible = this._eligibleTargets(draggedWithParents, draggingGroup);
+
+    const targets = eligible.map((node) => {
+      const rect = this._mediator.execute(new GetNormalizedElementRectRequest(node.hostElement));
+
+      return { node, rect };
+    });
+
+    return this._mediator.execute(new SortDropCandidatesByLayerRequest(targets));
+  }
+
+  private _getDraggedNodes(): FNodeBase[] {
+    const handler = this._dragContext.draggableItems.find((x) => x instanceof DragNodeHandler);
+
+    return handler ? handler.items.map((h) => h.nodeOrGroup) : [];
+  }
+
+  private _withParents(nodes: FNodeBase[]): FNodeBase[] {
+    return nodes.reduce((result: FNodeBase[], node: FNodeBase) => {
+      result.push(node);
+
+      const parents = this._mediator.execute(new GetParentNodesRequest(node));
+      result.push(...parents);
+
+      return result;
+    }, []);
+  }
+
+  private _eligibleTargets(draggedWithParents: FNodeBase[], draggingGroup: boolean): FNodeBase[] {
+    const nonDragged = this._allNodes.filter((n) => !draggedWithParents.includes(n));
+
+    return draggingGroup ? nonDragged.filter((n) => n instanceof FGroupDirective) : nonDragged;
+  }
+}

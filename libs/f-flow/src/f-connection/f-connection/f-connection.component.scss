@@ -1,0 +1,18 @@
+f-connection {
+  pointer-events: none;
+
+  > svg {
+    display: block;
+    vertical-align: middle;
+    overflow: visible !important;
+    position: absolute;
+
+    .f-connection-group {
+      pointer-events: all;
+    }
+  }
+
+  .f-connection-content {
+    pointer-events: all;
+  }
+}

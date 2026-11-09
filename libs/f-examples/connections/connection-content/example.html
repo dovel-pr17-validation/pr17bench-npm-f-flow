@@ -1,0 +1,133 @@
+<f-flow fInitialView fDraggable (fLoaded)="loaded()">
+  <f-canvas fZoom>
+    <f-connection
+      [fReassignDisabled]="true"
+      fOutputId="1"
+      fInputId="2"
+      fBehavior="fixed"
+      fType="segment"
+    >
+      <div fConnectionContent [position]="position()" [align]="align()" [offset]="offset()">
+        Any Content
+      </div>
+    </f-connection>
+    <f-connection
+      [fReassignDisabled]="true"
+      fOutputId="3"
+      fInputId="4"
+      fBehavior="fixed"
+      fType="bezier"
+    >
+      <div fConnectionContent [position]="position()" [align]="align()" [offset]="offset()">
+        Any Content
+      </div>
+    </f-connection>
+    <f-connection
+      [fReassignDisabled]="true"
+      fOutputId="5"
+      fInputId="6"
+      fBehavior="fixed"
+      fType="straight"
+    >
+      <div fConnectionContent [position]="position()" [align]="align()" [offset]="offset()">
+        Any Content
+      </div>
+    </f-connection>
+    <f-connection
+      [fReassignDisabled]="true"
+      fOutputId="7"
+      fInputId="8"
+      fBehavior="fixed"
+      fType="adaptive-curve"
+    >
+      <div fConnectionContent [position]="position()" [align]="align()" [offset]="offset()">
+        Any Content
+      </div>
+    </f-connection>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 0, y: 0 }"
+      fNodeOutput
+      fOutputId="1"
+      fOutputConnectableSide="bottom"
+    >
+      Node 1
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 300, y: 0 }"
+      fNodeInput
+      fInputId="2"
+      fInputConnectableSide="top"
+    >
+      Node 2
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 0, y: 150 }"
+      fNodeOutput
+      fOutputId="3"
+      fOutputConnectableSide="bottom"
+    >
+      Node 3
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 300, y: 150 }"
+      fNodeInput
+      fInputId="4"
+      fInputConnectableSide="top"
+    >
+      Node 4
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 0, y: 300 }"
+      fNodeOutput
+      fOutputId="5"
+      fOutputConnectableSide="bottom"
+    >
+      Node 5
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 300, y: 300 }"
+      fNodeInput
+      fInputId="6"
+      fInputConnectableSide="top"
+    >
+      Node 6
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 0, y: 450 }"
+      fNodeOutput
+      fOutputId="7"
+      fOutputConnectableSide="bottom"
+    >
+      Node 7
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 300, y: 450 }"
+      fNodeInput
+      fInputId="8"
+      fInputConnectableSide="top"
+    >
+      Node 8
+    </div>
+  </f-canvas>
+</f-flow>
+<f-toolbar>
+  <f-select [(value)]="position" [options]="positions" label="Position" />
+  <f-select [(value)]="align" [options]="aligns" label="Align" />
+  <f-select [(value)]="offset" [options]="offsets" label="Offset" />
+</f-toolbar>

@@ -1,0 +1,63 @@
+{
+  "name": "@foblex/flow",
+  "version": "19.4.0",
+  "description": "The most adopted node editor library for Angular. Angular-native, for production workflow builders, AI pipelines, and interactive diagram editors.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "author": "Siarhei Huzarevich",
+  "homepage": "https://flow.foblex.com",
+  "docs": "https://flow.foblex.com/docs/get-started",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Foblex/f-flow.git"
+  },
+  "license": "MIT",
+  "private": false,
+  "keywords": [
+    "angular",
+    "flow",
+    "javascript",
+    "typescript",
+    "graph",
+    "flowchart",
+    "node-based-ui",
+    "node editor",
+    "workflow builder",
+    "diagram",
+    "diagram library",
+    "dataflow",
+    "workflow",
+    "graph ui",
+    "interactive graph",
+    "foblex",
+    "node-editor",
+    "react flow alternative",
+    "react-flow angular",
+    "graph editor",
+    "visual programming",
+    "angular workflow",
+    "drag and drop",
+    "flow builder",
+    "angular diagram",
+    "no-code"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.schematics.json",
+    "postbuild": "copyfiles schematics/*/schema.json schematics/*/files/** schematics/collection.json ../../dist/f-flow/"
+  },
+  "schematics": "./schematics/collection.json",
+  "ng-update": {
+    "migrations": "./schematics/migrations.json"
+  },
+  "ng-add": {
+    "save": "dependencies"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=17.3.0",
+    "@angular/core": ">=17.3.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false
+}

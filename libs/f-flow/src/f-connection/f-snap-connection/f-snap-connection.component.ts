@@ -1,0 +1,112 @@
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  input,
+  Input,
+  numberAttribute,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  output,
+  signal,
+  ViewEncapsulation,
+} from '@angular/core';
+import { FSnapTargetChangeEvent } from './f-snap-target-change-event';
+import { EmitConnectionsChangesRequest } from '../../f-storage';
+import { castToEnum } from '../../_libs/f-utils';
+import { FMediator } from '../../_libs/f-mediator';
+import {
+  AddSnapConnectionToStoreRequest,
+  RemoveSnapConnectionFromStoreRequest,
+} from '../../domain';
+import {
+  EFConnectionBehavior,
+  EFConnectionConnectableSide,
+  EFConnectionType,
+  F_CONNECTION_COMPONENTS_PARENT,
+  FConnectionBase,
+} from '../../f-connection-v2';
+
+let uniqueId = 0;
+
+@Component({
+  standalone: false,
+  selector: 'f-snap-connection',
+  templateUrl: './f-snap-connection.component.html',
+  styleUrls: ['./f-snap-connection.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'f-component f-connection f-snap-connection',
+    'aria-hidden': 'true',
+  },
+  providers: [{ provide: F_CONNECTION_COMPONENTS_PARENT, useExisting: FSnapConnectionComponent }],
+  encapsulation: ViewEncapsulation.None,
+})
+export class FSnapConnectionComponent
+  extends FConnectionBase
+  implements AfterViewInit, OnInit, OnChanges, OnDestroy
+{
+  public override fId = signal<string>(`f-snap-connection-${uniqueId++}`);
+
+  @Input({ transform: numberAttribute })
+  public fSnapThreshold: number = 20;
+
+  /**
+   * Fires when the snapped target changes during a connection-creation gesture:
+   * with the connector id while one is within `fSnapThreshold`, and with an
+   * `undefined` target when the snap is released or the gesture ends.
+   */
+  public readonly fSnapTargetChange = output<FSnapTargetChangeEvent>();
+
+  public override fOutputId = signal('');
+
+  public override fInputId = signal('');
+
+  @Input({ transform: numberAttribute })
+  public override fRadius: number = 8;
+
+  @Input({ transform: numberAttribute })
+  public override fOffset: number = 12;
+
+  @Input({ transform: (value: unknown) => castToEnum(value, 'fBehavior', EFConnectionBehavior) })
+  public override fBehavior: EFConnectionBehavior = EFConnectionBehavior.FIXED;
+
+  @Input()
+  public override fType: EFConnectionType | string = EFConnectionType.STRAIGHT;
+
+  public override fInputSide = input(EFConnectionConnectableSide.DEFAULT, {
+    transform: (x) => {
+      return castToEnum(x, 'fInputSide', EFConnectionConnectableSide);
+    },
+  });
+
+  public override fOutputSide = input(EFConnectionConnectableSide.DEFAULT, {
+    transform: (x) => {
+      return castToEnum(x, 'fOutputSide', EFConnectionConnectableSide);
+    },
+  });
+
+  public override get boundingElement(): HTMLElement | SVGElement {
+    return this.fPath().hostElement;
+  }
+
+  private readonly _mediator = inject(FMediator);
+
+  public ngOnInit(): void {
+    this._mediator.execute(new AddSnapConnectionToStoreRequest(this));
+  }
+
+  public ngAfterViewInit(): void {
+    this.hide();
+  }
+
+  public ngOnChanges(): void {
+    this._mediator.execute(new EmitConnectionsChangesRequest());
+  }
+
+  public ngOnDestroy(): void {
+    this._mediator.execute(new RemoveSnapConnectionFromStoreRequest());
+  }
+}

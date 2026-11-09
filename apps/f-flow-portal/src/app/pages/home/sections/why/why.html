@@ -1,0 +1,10 @@
+<section-head kicker="Why Foblex Flow" title="Built for real editors. Proven in real products." />
+
+<div class="grid">
+  @for (card of cards; track card.title) {
+  <article class="card">
+    <h3>{{ card.title }}</h3>
+    <p>{{ card.description }}</p>
+  </article>
+  }
+</div>

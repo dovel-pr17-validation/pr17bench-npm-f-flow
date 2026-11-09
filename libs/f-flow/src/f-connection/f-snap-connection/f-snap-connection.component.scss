@@ -1,0 +1,16 @@
+f-snap-connection {
+  pointer-events: none;
+  position: absolute;
+
+  > svg {
+    overflow: visible;
+
+    .f-connection-group {
+      pointer-events: all;
+    }
+  }
+
+  .f-connection-content {
+    pointer-events: all;
+  }
+}

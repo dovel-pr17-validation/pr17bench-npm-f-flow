@@ -1,0 +1,73 @@
+import {
+  booleanAttribute,
+  Directive,
+  ElementRef,
+  inject,
+  input,
+  Input,
+  OnDestroy,
+  OnInit,
+} from '@angular/core';
+import { F_NODE_OUTLET, FNodeOutletBase } from './f-node-outlet-base';
+import { injectConnectorNode } from '../inject-connector-node';
+import { FMediator } from '../../_libs/f-mediator';
+import { AddConnectorToStoreRequest, RemoveConnectorFromStoreRequest } from '../../domain';
+import { stringAttribute } from '../../utils';
+import { EFConnectableSide } from '../../f-connection-v2';
+
+let uniqueId = 0;
+
+/** @deprecated Use fConnector with fConnectorType="outlet". */
+@Directive({
+  standalone: false,
+  selector: '[fNodeOutlet]',
+  exportAs: 'fNodeOutlet',
+  host: {
+    '[attr.data-f-outlet-id]': 'fId()',
+    class: 'f-component f-node-outlet',
+    '[class.f-node-outlet-disabled]': 'disabled()',
+  },
+  providers: [{ provide: F_NODE_OUTLET, useExisting: FNodeOutletDirective }],
+})
+export class FNodeOutletDirective extends FNodeOutletBase implements OnInit, OnDestroy {
+  public readonly hostElement = inject(ElementRef).nativeElement;
+
+  private readonly _mediator = inject(FMediator);
+  private readonly _node = injectConnectorNode('[fNodeOutlet]');
+
+  public override fId = input<string, unknown>(`f-node-outlet-${uniqueId++}`, {
+    alias: 'fOutletId',
+    transform: (value) => stringAttribute(value) || `f-node-outlet-${uniqueId++}`,
+  });
+
+  public override disabled = input<boolean, unknown>(false, {
+    alias: 'fOutletDisabled',
+    transform: booleanAttribute,
+  });
+
+  public override fConnectableSide: EFConnectableSide = EFConnectableSide.AUTO;
+
+  public override userFConnectableSide: EFConnectableSide = EFConnectableSide.AUTO;
+
+  @Input()
+  public override isConnectionFromOutlet: boolean = false;
+
+  @Input({ alias: 'fCanBeConnectedInputs' })
+  public override canBeConnectedInputs: string[] = [];
+
+  public override get fNodeId(): string {
+    return this._node.fId();
+  }
+
+  public override get fNodeHost(): HTMLElement | SVGElement {
+    return this._node.hostElement;
+  }
+
+  public ngOnInit() {
+    this._mediator.execute(new AddConnectorToStoreRequest(this));
+  }
+
+  public ngOnDestroy(): void {
+    this._mediator.execute(new RemoveConnectorFromStoreRequest(this));
+  }
+}

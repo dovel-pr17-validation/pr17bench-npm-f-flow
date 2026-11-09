@@ -1,0 +1,106 @@
+<f-flow
+  fInitialView
+  fDraggable
+  (fFullRendered)="loaded()"
+  (fConnectionWaypointsChanged)="changed($event)"
+>
+  <f-canvas>
+    <f-connection
+      [fReassignDisabled]="true"
+      fType="straight"
+      fSourceId="1"
+      fTargetId="2"
+      fSourceSide="calculate"
+      fTargetSide="calculate"
+    >
+      @if (waypointsOn()) {
+      <f-connection-waypoints
+        [(waypoints)]="waypointsStraight"
+        radius="8"
+        [visibility]="waypointsVisibility()"
+      />
+      }
+    </f-connection>
+    <div fNode fDragHandle [fNodePosition]="{ x: -150, y: 0 }" fConnector fConnectorId="1">
+      Node
+    </div>
+    <div fNode fDragHandle [fNodePosition]="{ x: 200, y: 0 }" fConnector fConnectorId="2">Node</div>
+
+    <f-connection
+      [fReassignDisabled]="true"
+      fType="segment"
+      fSourceId="3"
+      fTargetId="4"
+      fSourceSide="calculate"
+      fTargetSide="calculate"
+    >
+      @if (waypointsOn()) {
+      <f-connection-waypoints
+        [(waypoints)]="waypointsSegment"
+        radius="4"
+        [visibility]="waypointsVisibility()"
+      />
+      }
+    </f-connection>
+    <div fNode fDragHandle [fNodePosition]="{ x: -150, y: 150 }" fConnector fConnectorId="3">
+      Node
+    </div>
+    <div fNode fDragHandle [fNodePosition]="{ x: 250, y: 200 }" fConnector fConnectorId="4">
+      Node
+    </div>
+
+    <f-connection
+      [fReassignDisabled]="true"
+      fType="bezier"
+      fSourceId="5"
+      fTargetId="6"
+      fSourceSide="calculate"
+      fTargetSide="calculate"
+    >
+      @if (waypointsOn()) {
+      <f-connection-waypoints
+        [(waypoints)]="waypointsBezier"
+        radius="6"
+        [visibility]="waypointsVisibility()"
+      />
+      }
+    </f-connection>
+    <div fNode fDragHandle [fNodePosition]="{ x: -150, y: 300 }" fConnector fConnectorId="5">
+      Node
+    </div>
+    <div fNode fDragHandle [fNodePosition]="{ x: 200, y: 350 }" fConnector fConnectorId="6">
+      Node
+    </div>
+
+    <f-connection
+      [fReassignDisabled]="true"
+      fType="adaptive-curve"
+      fSourceId="7"
+      fTargetId="8"
+      fSourceSide="calculate"
+      fTargetSide="calculate"
+    >
+      @if (waypointsOn()) {
+      <f-connection-waypoints
+        [(waypoints)]="waypointsAdaptiveCurve"
+        [visibility]="waypointsVisibility()"
+      />
+      }
+    </f-connection>
+    <div fNode fDragHandle [fNodePosition]="{ x: -150, y: 450 }" fConnector fConnectorId="7">
+      Node
+    </div>
+    <div fNode fDragHandle [fNodePosition]="{ x: 250, y: 500 }" fConnector fConnectorId="8">
+      Node
+    </div>
+  </f-canvas>
+</f-flow>
+
+<f-toolbar>
+  <f-checkbox (change)="toggleWaypointsVisibility()" [checked]="waypointsVisibility()">
+    Show waypoints
+  </f-checkbox>
+  <f-checkbox (change)="toggleWaypointsOn()" [checked]="waypointsOn()">
+    Enable waypoints
+  </f-checkbox>
+</f-toolbar>

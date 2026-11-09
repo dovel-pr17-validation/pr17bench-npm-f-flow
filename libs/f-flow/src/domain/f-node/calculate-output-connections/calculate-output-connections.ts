@@ -1,0 +1,48 @@
+import { inject, Injectable } from '@angular/core';
+import { IExecution } from '../../../_libs/f-mediator';
+import { CalculateOutputConnectionsRequest } from './calculate-output-connections-request';
+import { FComponentsStore } from '../../../f-storage';
+import { FNodeBase } from '../../../f-node';
+import { getAllSourceConnectors } from '../../../f-connectors';
+import { FConnectionBase } from '../../../f-connection-v2';
+
+/**
+ * Execution that calculates output connections for a given FNode.
+ */
+@Injectable()
+export class CalculateOutputConnections implements IExecution<
+  CalculateOutputConnectionsRequest,
+  FConnectionBase[]
+> {
+  private readonly _store = inject(FComponentsStore);
+
+  public handle({ nodeOrGroup }: CalculateOutputConnectionsRequest): FConnectionBase[] {
+    const ids = this._collectOutputIds(nodeOrGroup);
+
+    return this._collectConnections(ids);
+  }
+
+  private _collectOutputIds(nodeOrGroup: FNodeBase): Set<string> {
+    const ids = new Set<string>();
+    const connectors = getAllSourceConnectors(this._store);
+    for (const connector of connectors) {
+      if (nodeOrGroup.isContains(connector.hostElement)) {
+        ids.add(connector.fId());
+      }
+    }
+
+    return ids;
+  }
+
+  private _collectConnections(ids: Set<string>): FConnectionBase[] {
+    const result: FConnectionBase[] = [];
+    const connections = this._store.connections.getAll();
+    for (const conn of connections) {
+      if (ids.has(conn.sourceId())) {
+        result.push(conn);
+      }
+    }
+
+    return result;
+  }
+}

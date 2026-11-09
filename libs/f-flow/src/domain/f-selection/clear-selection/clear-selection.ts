@@ -1,0 +1,18 @@
+import { ClearSelectionRequest } from './clear-selection-request';
+import { inject, Injectable } from '@angular/core';
+import { IExecution } from '../../../_libs/f-mediator';
+import { FDraggableDataContext } from '../../../f-draggable';
+
+/**
+ * Execution that clears the selection of items in the FDraggableDataContext.
+ */
+@Injectable()
+export class ClearSelection implements IExecution<ClearSelectionRequest, void> {
+  private _dragContext = inject(FDraggableDataContext);
+
+  public handle(_: ClearSelectionRequest): void {
+    this._dragContext.selectedItems.forEach((x) => x.unmarkAsSelected());
+    this._dragContext.selectedItems = [];
+    this._dragContext.isSelectedChanged = true;
+  }
+}

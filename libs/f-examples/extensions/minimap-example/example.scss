@@ -1,0 +1,20 @@
+@use '@foblex/flow/styles' as flow-theme;
+
+::ng-deep {
+  @include flow-theme.theme-tokens();
+}
+
+::ng-deep f-flow {
+  @include flow-theme.connection($scoped: false);
+  @include flow-theme.minimap($scoped: false);
+
+  .custom-class-for-minimap {
+    fill: var(--ff-color-danger) !important;
+
+    &.f-selected {
+      fill: var(--ff-minimap-node-selected-color) !important;
+    }
+  }
+}
+
+@include flow-theme.node($selectorless: false);

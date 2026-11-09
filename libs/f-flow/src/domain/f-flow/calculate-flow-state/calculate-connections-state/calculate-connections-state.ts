@@ -1,0 +1,35 @@
+import { inject, Injectable } from '@angular/core';
+import { CalculateConnectionsStateRequest } from './calculate-connections-state-request';
+import { IExecution } from '../../../../_libs/f-mediator';
+import { FComponentsStore } from '../../../../f-storage';
+import { IFFlowStateConnection } from '../i-f-flow-state-connection';
+import { FConnectionBase } from '../../../../f-connection-v2';
+
+/**
+ * Execution that retrieves the current Flow state connections from the FComponentsStore.
+ */
+@Injectable()
+export class CalculateConnectionsState implements IExecution<
+  CalculateConnectionsStateRequest,
+  IFFlowStateConnection[]
+> {
+  private readonly _store = inject(FComponentsStore);
+
+  public handle(_request: CalculateConnectionsStateRequest): IFFlowStateConnection[] {
+    return this._store.connections.getAll().map(this._mapToConnectionState);
+  }
+
+  private _mapToConnectionState(x: FConnectionBase): IFFlowStateConnection {
+    return {
+      id: x.fId(),
+      fOutputId: x.sourceId(),
+      fInputId: x.targetId(),
+      fType: x.fType,
+      fBehavior: x.fBehavior,
+      isSelected: x.isSelected(),
+      waypoints: x.fWaypoints()?.waypoints() || [],
+      fInputSide: x.fInputSide(),
+      fOutputSide: x.fOutputSide(),
+    };
+  }
+}

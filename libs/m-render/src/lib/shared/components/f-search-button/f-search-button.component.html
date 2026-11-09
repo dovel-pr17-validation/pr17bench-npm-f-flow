@@ -1,0 +1,11 @@
+@if (hasTrigger) {
+  <button type="button" class="trigger-search" (click)="onTriggerClick()" aria-label="Search">
+    <span class="f-icon search"></span>
+  </button>
+} @else if (configuration()) {
+  <div #searchContainer class="search-container"></div>
+} @else {
+  <button type="button" class="trigger-search" disabled aria-label="Search">
+    <span class="f-icon search"></span>
+  </button>
+}

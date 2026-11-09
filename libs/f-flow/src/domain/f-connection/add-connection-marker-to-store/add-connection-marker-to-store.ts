@@ -1,0 +1,20 @@
+import { inject, Injectable } from '@angular/core';
+import { IExecution } from '../../../_libs/f-mediator';
+import { AddConnectionMarkerToStoreRequest } from './add-connection-marker-to-store-request';
+import { FComponentsStore } from '../../../f-storage';
+
+/**
+ * Execution that adds a connection marker to the FComponentsStore.
+ */
+@Injectable()
+export class AddConnectionMarkerToStore implements IExecution<
+  AddConnectionMarkerToStoreRequest,
+  void
+> {
+  private readonly _store = inject(FComponentsStore);
+
+  public handle({ instance }: AddConnectionMarkerToStoreRequest): void {
+    this._store.connectionMarkers.add(instance);
+    this._store.emitNodeChanges();
+  }
+}

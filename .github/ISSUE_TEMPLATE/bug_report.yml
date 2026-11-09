@@ -1,0 +1,83 @@
+name: Bug Report
+description: Report a bug in the Foblex Flow library
+title: "[Bug]: "
+labels: [bug, needs investigation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug.
+
+        Please focus on one reproducible problem per issue. Exact steps and expected behavior are more useful than broad descriptions.
+
+  - type: input
+    id: affected_version
+    attributes:
+      label: Affected Version
+      description: Which Foblex Flow version is affected?
+      placeholder: "18.1.0"
+    validations:
+      required: false
+
+  - type: input
+    id: reproduction_url
+    attributes:
+      label: Reproduction URL (StackBlitz, GitHub, etc.)
+      placeholder: "https://stackblitz.com/edit/foblex-flow-repro"
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Describe the exact steps to trigger the bug
+      placeholder: |
+        1. Open Canvas
+        2. Drag a node
+        3. Try to connect inputs
+        4. Error occurs
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Optional, but helpful for defining the expected fix.
+      placeholder: |
+        - the bug is reproducible before the fix
+        - the failing behavior is corrected
+        - related interactions remain stable
+        - regression coverage is added when appropriate
+    validations:
+      required: false
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+    validations:
+      required: false

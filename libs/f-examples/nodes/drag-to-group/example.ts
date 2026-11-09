@@ -1,0 +1,101 @@
+import { ChangeDetectionStrategy, Component, signal, viewChild } from '@angular/core';
+import { FCanvasComponent, FCreateNodeEvent, FDropToGroupEvent, FFlowModule } from '@foblex/flow';
+import { FCheckboxComponent, FExternalPaletteComponent, FToolbarComponent } from '@foblex/m-render';
+
+interface INode {
+  id: string;
+  position: { x: number; y: number };
+  parentId?: string;
+}
+
+@Component({
+  selector: 'drag-to-group',
+  styleUrls: ['./example.scss'],
+  templateUrl: './example.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  standalone: true,
+  imports: [FFlowModule, FCheckboxComponent, FToolbarComponent, FExternalPaletteComponent],
+})
+export class Example {
+  private readonly _canvas = viewChild.required(FCanvasComponent);
+
+  protected readonly dropToGroup = signal<boolean>(true);
+  protected readonly includePaddings = signal<boolean>(true);
+  protected readonly autoSizeToFitChildren = signal<boolean>(true);
+  protected readonly autoExpandOnChildHit = signal<boolean>(true);
+
+  protected readonly groups = signal<INode[]>([
+    {
+      id: 'g1',
+      position: { x: 0, y: 0 },
+    },
+    {
+      id: 'g2',
+      position: { x: 0, y: 250 },
+    },
+  ]);
+
+  protected readonly nodes = signal<INode[]>([
+    {
+      id: 'n1',
+      position: { x: 250, y: 0 },
+    },
+    {
+      id: 'n2',
+      position: { x: 250, y: 250 },
+    },
+  ]);
+
+  protected loaded(): void {
+    this._canvas()?.resetScaleAndCenter(false);
+  }
+
+  protected changeDropToGroup(): void {
+    this.dropToGroup.set(!this.dropToGroup());
+  }
+
+  protected changePaddings(): void {
+    this.includePaddings.set(!this.includePaddings());
+  }
+
+  protected changeSizeToFitChildren(): void {
+    this.autoSizeToFitChildren.set(!this.autoSizeToFitChildren());
+  }
+
+  protected changeExpandOnChildHit(): void {
+    this.autoExpandOnChildHit.set(!this.autoExpandOnChildHit());
+  }
+
+  protected onDropToGroup(event: FDropToGroupEvent): void {
+    if (!event.targetGroupId) {
+      return;
+    }
+
+    const groups = this.groups();
+    const nodes = this.nodes();
+
+    event.nodeIds.forEach((id) => {
+      const group = groups.find((x) => x.id === id);
+      if (group) {
+        group.parentId = event.targetGroupId;
+      } else {
+        const node = nodes.find((x) => x.id === id);
+        if (node) {
+          node.parentId = event.targetGroupId;
+        }
+      }
+    });
+    this.groups.set([...groups]);
+    this.nodes.set([...nodes]);
+  }
+
+  protected createNode(event: FCreateNodeEvent): void {
+    const newNode: INode = {
+      id: 'n' + (this.nodes().length + 1),
+      position: event.externalItemRect,
+      parentId: event.targetContainerId,
+    };
+
+    this.nodes.set([...this.nodes(), newNode]);
+  }
+}

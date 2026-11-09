@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "NgAdd",
+  "title": "Foblex Flow ng-add",
+  "type": "object",
+  "properties": {
+    "skipAgentRules": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip writing the Foblex Flow section into AGENTS.md and its Claude Code import into CLAUDE.md."
+    }
+  }
+}

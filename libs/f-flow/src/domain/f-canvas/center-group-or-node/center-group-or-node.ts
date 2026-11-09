@@ -1,0 +1,69 @@
+import { inject, Injectable } from '@angular/core';
+import { CenterGroupOrNodeRequest } from './center-group-or-node-request';
+import { FMediator, IExecution } from '../../../_libs/f-mediator';
+import {
+  IPoint,
+  IRect,
+  ITransformModel,
+  PointExtensions,
+  RectExtensions,
+} from '../../../_libs/f-2d';
+import { FComponentsStore } from '../../../f-storage';
+import { FNodeBase } from '../../../f-node';
+import { ECanvasRedrawContext, RedrawCanvasWithAnimationRequest } from '../../../domain';
+
+/**
+ * Execution that centers a group or a node inside the flow.
+ */
+@Injectable()
+export class CenterGroupOrNode implements IExecution<CenterGroupOrNodeRequest, void> {
+  private readonly _store = inject(FComponentsStore);
+  private readonly _mediator = inject(FMediator);
+
+  private get _transform(): ITransformModel {
+    return this._store.transform;
+  }
+
+  public handle({ id, animated, emitCanvasChange, resetScale }: CenterGroupOrNodeRequest): void {
+    const node = this._store.nodes.get(id);
+    if (!node) {
+      return;
+    }
+
+    this._toCenter(this._getNodeRect(node), this._getFlowRect(), node._position, resetScale);
+
+    this._mediator.execute(
+      new RedrawCanvasWithAnimationRequest(
+        animated,
+        ECanvasRedrawContext.VIEWPORT_ONLY,
+        emitCanvasChange,
+      ),
+    );
+  }
+
+  private _toCenter(
+    fNodeRect: IRect,
+    fFlowRect: IRect,
+    position: IPoint,
+    resetScale: boolean,
+  ): void {
+    const currentScale = this._transform.scale;
+    const targetScale = resetScale ? 1 : currentScale;
+    const sizeScale = currentScale === 0 ? 1 : targetScale / currentScale;
+
+    this._transform.scaledPosition = PointExtensions.initialize();
+    this._transform.scale = targetScale;
+    this._transform.position = PointExtensions.initialize(
+      (fFlowRect.width - fNodeRect.width * sizeScale) / 2 - position.x * targetScale,
+      (fFlowRect.height - fNodeRect.height * sizeScale) / 2 - position.y * targetScale,
+    );
+  }
+
+  private _getNodeRect(fNode: FNodeBase): IRect {
+    return RectExtensions.fromElement(fNode.hostElement);
+  }
+
+  private _getFlowRect(): IRect {
+    return RectExtensions.fromElement(this._store.flowHost);
+  }
+}

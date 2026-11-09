@@ -1,0 +1,26 @@
+import { Provider } from '@angular/core';
+
+/**
+ * Discriminator for `with*()` features composed by `provideFFlow`.
+ */
+export enum EFFlowFeatureKind {
+  INITIAL_VIEW = 'initial-view',
+  REFLOW_ON_RESIZE = 'reflow-on-resize',
+  CANVAS = 'canvas',
+  CONTROL_SCHEME = 'control-scheme',
+  CONNECTION_FLOW = 'connection-flow',
+  A11Y = 'a11y',
+  STATE = 'state',
+}
+
+/**
+ * Feature envelope returned by `with*()` helpers.
+ *
+ * Each helper returns a kind tag and the provider list that activates the feature.
+ * `provideFFlow` flattens these into a single `Provider[]` placed in the host's
+ * `providers` array.
+ */
+export interface IFFlowFeature<K extends EFFlowFeatureKind = EFFlowFeatureKind> {
+  readonly kind: K;
+  readonly providers: Provider[];
+}

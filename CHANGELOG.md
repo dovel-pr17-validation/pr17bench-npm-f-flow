@@ -1,0 +1,1171 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+
+## [19.4.0] - 2026-10-25
+
+### Fixes
+
+- **minimap:** `<f-minimap>` no longer crashes SSR/prerender — the transform-changes subscription (whose pipe schedules `requestAnimationFrame` from a microtask) is now guarded for the browser before subscribing, instead of relying on the guard inside `_redraw()` that sat downstream of the throwing call ([#341](https://github.com/Foblex/f-flow/issues/341)).
+- **virtualization:** `*fVirtualFor` no longer crashes SSR/prerender — on the server it renders all views synchronously instead of starting the `requestAnimationFrame` frame pump, which does not exist in Node ([#340](https://github.com/Foblex/f-flow/issues/340)).
+- **external items:** destroyed `[fExternalItem]` directives are removed from `FExternalItemService` instead of being re-registered, so routed pages with palettes no longer leak their views and DOM through the root-provided service ([#335](https://github.com/Foblex/f-flow/issues/335)). Thanks @arunraja92.
+- **diagnostics:** a node wrapped by its component's host element no longer breaks the drag gesture with an `Unknown container` throw — layer raising is skipped with a one-shot dev-mode warning `FF1012` that explains the supported pattern ([#337](https://github.com/Foblex/f-flow/issues/337)). Thanks @i3ene.
+- **external items:** the drag preview stays under the pointer on a scrolled page — its transform is written in viewport coordinates now that the preview is `position: fixed`, so the scroll offset is no longer applied twice, and the dropped node (`FCreateNodeEvent.externalItemRect`) lands where the preview was released ([#339](https://github.com/Foblex/f-flow/pull/339)). Thanks @itaishopen-unyx.
+
+- **flow:** `getPositionInFlow()` is now typed truthfully as returning `IPoint` - it never returned a rect, so code reading `width`/`height` from the old `IRect` type was getting `undefined` at runtime.
+- **reflow:** a top/left-handle resize no longer silently kills reflow-on-resize for the node. The resize handler never mirrored the final position back into the `fNodePosition` model (the drag handler always did), so after any position-changing resize the orchestrator's mid-flight guard saw a permanent model/`_position` mismatch and skipped the node in every later plan — the axis/delta-source/runtime-config switches looked broken while the whole feature was dead for that node. The model now syncs on pointer-up (which also makes `fNodePositionChange` emit for position-changing resizes), and the guard tolerates sub-pixel drift from resizes on a zoomed canvas.
+
+### Features
+
+- **initial view:** new `provideFFlow(withInitialView())` feature — the flow renders invisibly (`visibility: hidden`, so layout and measurements still happen) and is revealed only after the first full render and the viewport work queued by the `(fFullRendered)` handler have been applied. Calling `fitToScreen(..., false)` or `centerGroupOrNode(..., false)` from the handler — the already-documented pattern — now produces a first visible frame that is fitted/centered from the start, with no jump from the default viewport. Without a handler the flow is simply revealed right after the first full render.
+
+### Performance
+
+- **render lifecycle:** `fNodesRendered`/`fFullRendered`/`fLoaded` fire as soon as the first render settles (store-level microtask coalescing plus one paint) instead of waiting out a fixed 120ms debounce — synchronously populated flows get their load events ~120ms earlier. The safety the wall clock silently provided is now explicit: an empty-canvas grace keeps async-loaded flows from latching the one-shot events before their data arrives (and a legitimately empty flow still completes its lifecycle), a render pass that fires mid-drag reruns right after pointer-up instead of being lost, dev diagnostics run behind their own settle window instead of inspecting transient states, and layer sorting skips the DOM entirely when the order is already settled, so grouped graphs stop restarting CSS transitions on every pass (see `docs/render-lifecycle-rework.md`).
+
+### Dependencies
+
+- **platform:** `@foblex/platform` is vendored into the library (`src/_libs/f-platform`) and removed from the peer dependencies — one package less to install, and its exports (`BrowserService`, `PlatformService`, …) are now available from `@foblex/flow` directly. The standalone npm package keeps working for code that imports it, but the library no longer requires it. The parts of the vendored API the library does not use — the local-storage services, the `PlatformService` browser flags, and `IWindowService.open`/`location`/`isMediaQuery` — are marked `@deprecated` and scheduled for removal in v20. Vendoring also fixed two latent issues: `toPixels` resolved `rem` values as `em` (the branch order made the `rem` path unreachable) and used the global `getComputedStyle` instead of the SSR-safe window service, and `getOS()` touched `navigator` without a browser guard.
+- **mediator:** `@foblex/mediator` is vendored into the library (`src/_libs/f-mediator`, byte-for-byte the published 1.1.3 sources) and removed from the peer dependencies; its symbols (`FMediator`, `FExecutionRegister`, `IExecution`, …) are re-exported from `@foblex/flow`. The `ng update` migration rewrites application imports to `@foblex/flow` and removes the obsolete dependency, so existing integrations — including advanced ones that inject `FMediator` — keep working against the single vendored copy. The re-exports are marked `@deprecated` and will be removed from the public API in v20: the request pipeline is not a supported way to drive the flow — use the public flow/canvas methods and flow-scoped services instead.
+- **utils:** `@foblex/utils` is vendored into the library (`src/_libs/f-utils`, byte-for-byte the published 1.1.1 sources) and removed from the peer dependencies; its helpers (`generateGuid`, `deepCloneNode`, `castToEnum`, …) are re-exported from `@foblex/flow` so migrated applications keep compiling. The `ng update` migration rewrites application imports to `@foblex/flow` and removes the obsolete dependency. The re-exports are marked `@deprecated` and will be removed from the public API in v20 — they are general-purpose helpers, not flow APIs; applications that keep using them should depend on `@foblex/utils` from npm directly (the package stays published). Vendoring also cleaned up three nits: `flatMap` builds its result linearly instead of re-copying the accumulator on every item, `isClosestElementHasClass` dropped a `-disabled` class check that could never match (callers pass dotted selectors, class tokens never contain dots — the function always behaved as a bare `closest()` test), and `getDataAttrValueFromClosestElementWithClass` is typed honestly as returning `T | undefined` instead of crashing on a missing ancestor.
+- **2d:** `@foblex/2d` is vendored into the library (`src/_libs/f-2d`, byte-for-byte the published 1.2.2 sources) and removed from the peer dependencies — the library now has no runtime dependencies besides Angular. Unlike the other vendored packages its symbols are re-exported from `@foblex/flow` as first-class public API, not deprecated aliases: the geometry types (`IPoint`, `IRect`, `ISize`, …) are the library's public vocabulary, so `import { IPoint } from '@foblex/flow'` is now the canonical form. The `ng update` migration rewrites application imports to `@foblex/flow` and removes the obsolete dependency. The layout packages (`@foblex/flow-dagre-layout`, `@foblex/flow-elk-layout`) import the geometry through `@foblex/flow` as well and no longer declare the `@foblex/2d` peer.
+- **schematics:** `ng update @foblex/flow` now runs migrations (the `ng-update.migrations` entry was missing, so the update schematic never ran automatically); the first migration rewrites application imports of `@foblex/platform` to `@foblex/flow` and removes the obsolete dependency from package.json.
+
+## [19.3.0] - 2026-09-28
+
+### Fixes
+
+- **connections:** the connection worker is terminated when its flow is destroyed, so recreated flows no longer leak worker threads and blob URLs ([#330](https://github.com/Foblex/f-flow/issues/330)). Thanks @chris-perry.
+- **styles:** component styles ship unencapsulated (`ViewEncapsulation.None`) and element-prefixed, so a strict CSP `style-src` can hash them ([#329](https://github.com/Foblex/f-flow/issues/329)). Thanks @chris-perry.
+- **styles:** connection svg rules scope to the component's own root svg (`> svg`), so projected content — custom `svg[fMarker]` markers and svg icons inside `[fConnectionContent]` — keeps its own layout.
+
+## [19.2.0] - 2026-09-20
+
+### Fixes
+
+- **connections:** dropping a connection on a node (`fConnectOnNode`) now attaches to the connector closest to the drop point instead of the first registered one ([#326](https://github.com/Foblex/f-flow/issues/326)); zero-size connectors resolve to the aimed-at connector as well.
+- **connections:** grabbing a reassign handle shared by several connections on the same connector now prefers the selected connection over registration order ([#328](https://github.com/Foblex/f-flow/discussions/328)).
+
+### Features
+
+- **canvas:** `fitToScreen` accepts an optional `maxScale` cap, so fitting a small graph no longer magnifies it to fill the viewport ([#147](https://github.com/Foblex/f-flow/issues/147)).
+- **connections:** `<f-snap-connection>` emits `fSnapTargetChange` when the snapped target is acquired, switched, or released during connection creation, so both endpoints can be styled while the snap preview is shown ([#180](https://github.com/Foblex/f-flow/issues/180)).
+- **diagnostics:** new dev-mode warning `FF1010` for rendered connectors whose own box has no size (dot drawn via `::before`/`::after`); threshold configurable through `provideFFlow({ diagnostics: { minConnectorSize } })`, `0` disables the check.
+- **diagnostics:** new dev-mode warning `FF1011` for nodes rendered away from their `fNodePosition` (app CSS moved the visuals while the model stayed put), so model-driven features — minimap, `fitToScreen`, auto-layout — stop disagreeing silently with the canvas ([#331](https://github.com/Foblex/f-flow/issues/331)); threshold configurable through `provideFFlow({ diagnostics: { maxNodePositionDrift } })`, `0` disables the check.
+
+## [19.1.7] - 2026-09-06
+
+### Fixes
+
+- **connections:** route segment connections through waypoints as pass-through anchors ([#324](https://github.com/Foblex/f-flow/issues/324)): no connector-like stubs or extra bends around waypoints, no paths that miss a dragged waypoint, routes prefer going around the endpoint nodes instead of through them, and waypoint-creation candidates always sit on straight runs of the line.
+- **connections:** bezier and adaptive curves pass through waypoints smoothly: connector sides shape only the endpoint tangents, and both segments meeting at a waypoint share one Catmull-Rom style tangent instead of kinking toward the connector directions.
+- **connections:** waypoint handles on rounded segment corners are drawn and hit-tested on the bend apex of the rendered path instead of the sharp corner point, so the handle always sits on the visible line; dragging still updates the real waypoint.
+
+### Features
+
+- **ng-add:** write a canonical Foblex Flow instruction block to `AGENTS.md` and ensure Claude Code loads it through an idempotent `@AGENTS.md` import in `CLAUDE.md`, while preserving existing project instructions.
+
+### Documentation
+
+- Surface the version-matched AI coding guide, LLM-readable documentation, diagnostics, and verification workflow in the README and on the portal home page.
+- Lead with verified adoption positioning (npm download data) across the portal home page, READMEs, package descriptions, and llms facts; surface named production products near the hero.
+- Add an honest source-linked ngx-vflow vs Foblex Flow comparison guide and cross-link it from the React Flow comparison and the 2026 libraries roundup.
+
+## [19.1.6] - 2026-07-27
+
+### Fixes
+
+- **layout packages:** require the matching `@foblex/flow` 19.x peer range. Versions `19.0.0` through `19.1.5` incorrectly retained `^18.4.0`, which excludes Flow 19.x and can make npm reject an otherwise valid installation with `ERESOLVE`.
+
+### Maintenance
+
+- Republish the synchronized core, Dagre, and ELK package train so `@foblex/flow`, `@foblex/flow-dagre-layout`, and `@foblex/flow-elk-layout` all resolve cleanly at `19.1.6`.
+
+## [19.1.5] - 2026-07-27
+
+### Features
+
+- **marketing-automation:** add a standalone campaign-journey reference app. Steps are inserted from add controls on connections and open branches, Dagre keeps the graph arranged top-to-bottom or left-to-right, and the editor combines managed state, persistence, undo/redo, the scroll-pan control scheme, keyboard accessibility, theming, and a responsive inspector. Selecting a step and its animated viewport centering are batched into one history item; a keyboard-selected add node opens the same picker with `Enter` as a pointer click.
+- **flow-state:** persist the current node, group, and connection selection in every `snapshot()` and restore it from `load()`, independently of `selectionInHistory`. Older snapshots remain compatible and load with an empty selection.
+- **f-canvas:** add `resetScaleAndCenterGroupOrNode(id, animated?, emitCanvasChange?)`, which centers one item while resetting zoom to `1`. Existing `centerGroupOrNode()` continues to preserve the current zoom.
+
+### Fixes
+
+- **a11y:** start arrow-key spatial navigation from the current single selection when selection came from a pointer, application state, or a restored snapshot. This prevents the first arrow press from falling back to the first registered node when `aria-activedescendant` is absent or stale.
+
+### Documentation
+
+- Document selection persistence, the new item-centering API, and the Marketing Automation architecture in the portal, bundled AI guide, and generated LLM/search artifacts.
+
+## [19.1.4] - 2026-07-18
+
+### Fixes
+
+- **reactivity:** stop `FChannelHub` callbacks as soon as Angular view destruction begins, skip listener registration for an already destroyed view, and discard delayed notifications while destroy callbacks are pending. This prevents intermittent `NG0911` failures and blank embedded examples during navigation.
+
+## [19.1.3] - 2026-07-17
+
+### Fixes
+
+- **flow-state:** make viewport history wait until the live canvas transform has settled before committing a debounced change. Continued wheel or pinch input now reschedules the pending write instead of restoring an older transform and making zoom jump backwards.
+- **m-render:** ignore lazy component resolutions after their view is destroyed or a newer render generation starts, preventing late `createComponent()` calls against disposed portal views. Dynamic input assignment and JSON dataset parsing were also made type-safe.
+
+### Configuration
+
+- **flow-state:** change the default `canvasTransformDebounce` from `0` to `350ms`. Set it to `0` explicitly when every emitted `fCanvasChange` must be recorded immediately as its own state change.
+
+## [19.1.2] - 2026-07-13
+
+### Fixes
+
+- **connectors:** resolve a unified connector from the nearest `[fConnector]` host for both drag-to-connect and click-to-connect. Nested connector content no longer makes connection creation select the wrong registered connector or fail to start.
+- **connections:** build worker redraw payloads from the connection's resolved source and target sides, so explicit connection-side settings keep priority over connector connectable-side defaults.
+
+### Examples
+
+- **call-center:** rebuild the reference app around managed Flow State, persistence, undo/redo, keyboard accessibility, the scroll-pan control scheme, unified connectors, and resize reflow. The resize and reflow sequence stays inside one open State transaction so expanding or collapsing a node creates one history item.
+
+## [19.1.1] - 2026-07-13
+
+### Maintenance
+
+- Republish the `19.1.0` package contents under the corrected patch version. There are no runtime API or behavior changes in this release.
+
+## [19.1.0](https://github.com/Foblex/f-flow/compare/v19.0.0...v19.1.0) (2026-07-13)
+
+### Highlights
+
+- **Managed Flow State:** opt into `provideFFlow(withFlowState())` to get typed node/group/connection signals, immutable programmatic mutations, automatic updates from supported gestures, batched undo/redo, viewport history, and persistable `load()`/`snapshot()` data. `injectFlowState<TNode, TConnection, TGroup>()` keeps application record fields typed without a `data` wrapper, and `stateClass` allows applications to override store behavior.
+- **Large-flow runtime work:** registry removals and store notifications are batched, connection redraws are scoped to affected geometry, minimap node geometry comes from cached model-space rectangles, pointer targeting uses DOM ancestry instead of scanning every node, connector border radii are cached, and connectable-side recalculation shares one scheduler.
+
+### Features
+
+- **shadow-dom:** support flows rendered inside Angular Elements and components using `ViewEncapsulation.ShadowDom`. Normal DOM events keep using `event.target`; document-level gestures fall back to the composed path only after Shadow DOM retargeting, and coordinate hit-testing enters open shadow roots. Closed shadow roots remain unsupported. Addresses [discussion #315](https://github.com/Foblex/f-flow/discussions/315).
+- **flow-state:** supported v1 gestures automatically update managed records for connection create/reassign, node/group movement, deletion, external-item creation, optional drop-to-group, selection, and canvas pan/zoom. One drag remains one history action even when selection and movement arrive in different ticks; `changes()` increments when the outer batch settles.
+- **flow-state:** add `historyLimit`, `selectionInHistory`, `canvasTransformInHistory`, `canvasTransformDebounce`, `dropToGroup`, `connectionFactory`, `nodeFactory`, and custom `stateClass` configuration.
+- **f-canvas:** `resetScaleAndCenter`, `fitToScreen`, and `centerGroupOrNode` now accept an optional `emitCanvasChange` argument. Pass `false` for initialization or another application-driven viewport change that must not enter external or managed history.
+- **f-draggable:** add the `fDropToGroup` toggle (gesture default remains `true`). Managed state applies the emitted reparenting only when its separate `dropToGroup` option is enabled; that state option defaults to `false`.
+
+### Performance
+
+- **connections:** redraw only connections affected by a changed node. A group geometry change also includes connections owned by descendant nodes, so grouped moves and state-driven restores remain correct without returning to a full redraw.
+- **minimap:** draw node rectangles from cached model-space geometry instead of measuring every node element on each pass, and reconcile rectangles by node id when batched registry updates settle.
+- **storage:** coalesce component-store notifications, batch registry removals, and compact retained registry snapshots outside the teardown loop.
+- **dragging:** resolve pointer targets through DOM ancestry, cache connector border radii used during geometry normalization, and share connectable-side recalculation scheduling across drag handlers.
+
+### Fixes
+
+- **node/group auto-size:** `fAutoSizeToFitChildren` now emits the final `fNodeSizeChange` / `fGroupSizeChange`, waits until child parent ids have settled before fitting, and removes stale explicit dimensions when a bound size is cleared.
+- **drag-to-group:** when a target uses both `fAutoExpandOnChildHit` and `fAutoSizeToFitChildren`, emit only the settled auto-fit size instead of a transient expanded size followed by the final one.
+
+### Documentation
+
+- Add a maintained zoneless Angular starter under `starters/minimal-flow` for StackBlitz and refresh the README, comparison, and use-case pages for the v19 API.
+
+### Managed state v1 scope
+
+- Rotation, connection waypoint editing, and user resize are not captured automatically in v1. Their existing outputs remain available for application-managed updates.
+- Automatic connection cascade on node/group removal resolves connector ownership from the rendered connector registry. Before connectors render (including immediate post-`load()` mutations and SSR), remove known attached connection ids explicitly inside the same `state.batch(...)`.
+
+## [19.0.0](https://github.com/Foblex/f-flow/compare/v18.6.1...v19.0.0) (2026-07-05)
+
+### Highlights
+
+- **Control Schemes** — `withControlScheme(...)` maps gestures to canvas actions for the whole editor at once, with Miro-like and draw.io-like presets and runtime switching through `FControlSchemeController`.
+- **Connection Flows** — `withConnectionFlow('click')` adds click-to-connect alongside drag, built on the new gesture-independent `FCreateConnectionSession` that custom gestures can drive too.
+- **Accessibility** — ARIA semantics in every flow by default, plus an opt-in keyboard layer (`withA11y()`): spatial arrow navigation over nodes and connections, grab-and-move, keyboard connection creation, screen-reader announcements, remappable keys, localizable messages.
+- **Unified Connector Model** — one `[fConnector]` directive replaces the `fNodeInput`/`fNodeOutput`/`fNodeOutlet` trio; connections gain canonical `fSourceId`/`fTargetId`. Legacy APIs keep working, deprecated.
+- **AI-Ready Toolchain** — dev-mode diagnostics with stable `FF1001`–`FF1009` codes, agent rules installed by `ng add`, and CI-validated LLM docs shipped inside the npm package.
+
+### Features
+
+- **control-scheme:** add `withControlScheme(...)` for `provideFFlow(...)` — a provider feature that installs a control scheme: the whole gesture-to-action mapping (node move, canvas pan, selection, create/reassign connection, resize, rotate, and wheel pan-vs-zoom) driving `fDraggable`, `f-canvas[fZoom]` and `f-selection-area` together, plus an `FControlSchemeController` for switching or tweaking the scheme at runtime via `setScheme()`. Ships the `IFControlScheme` type and three presets — `F_DEFAULT_CONTROL_SCHEME` (drag pans, wheel zooms, `Shift`+drag selects; applied when the feature is absent, so existing apps are unchanged), `F_SCROLL_PAN_CONTROL_SCHEME` (Miro-like: scroll pans, `Ctrl`/`Cmd`+scroll or pinch zooms, drag on the empty canvas selects, middle-drag pans) and `F_DRAG_SELECT_CONTROL_SCHEME` (draw.io-like: wheel zooms, drag on the empty canvas selects, middle-drag pans). The interaction trigger inputs (`[fNodeMoveTrigger]`, `[fCanvasMoveTrigger]`, `[fWheelTrigger]`, `[fTrigger]`, …) keep their names and types and override the active scheme when set. New `primaryButtonEventTrigger`, `middleButtonEventTrigger` and `isOnFlowBackground` helpers are exported for building custom schemes. The middle mouse button joins the drag pipeline only when the active scheme's `canvasMove` gesture claims it — without a scheme it stays inert as before.
+- **f-zoom:** scroll-to-pan and pinch step — when the active scheme's `scrollPan` is on, a plain wheel or two-finger trackpad scroll pans the canvas while `Ctrl`/`Cmd`+wheel and trackpad pinch still zoom; the new `fPinchStep` input gives trackpad pinch a separate zoom step from the mouse wheel (falls back to `fZoomStep`). Closes [#312](https://github.com/Foblex/f-flow/issues/312) and enables the mouse-wheel scrolling use case from [#218](https://github.com/Foblex/f-flow/issues/218). Scroll-pan and the pinch step were independently proposed in [#313](https://github.com/Foblex/f-flow/pull/313) by [@yaroslavyushchenko](https://github.com/yaroslavyushchenko) — merged and unified into the scheme-driven implementation.
+- **selection:** a pointer-down that only starts the selection rectangle now still runs single-selection unless `Shift` is held, so under schemes that bind the selection area to a plain drag a click on the empty canvas clears the selection and a marquee replaces it, while `Shift`+drag stays additive. With the default `Shift`-gated selection area every marquee is a `Shift` gesture, so pointer-down semantics are unchanged.
+- **a11y:** built-in accessibility layer in every flow, including keyboard connection creation. Semantics run always: nodes, groups and connections get `role`/`aria-roledescription`/accessible names (a connection reads "Connection from X to Y" and the generated name tracks endpoint changes; attributes you set yourself are never overridden), a persistent live region announces selection, movement, connection and deletion (WCAG 4.1.3), and the minimap/connection previews are hidden from screen readers. The keyboard layer is opt-in (`provideFFlow(withA11y())`) — existing apps with their own key handling are never double-driven. With it on, the host becomes the widget's entry point (`tabindex="0"`, `role="application"` so screen readers hand the arrow keys to the canvas, keyboard instructions as its description) and the keys drive SELECTION directly — DOM focus stays on the `f-flow` host and the active item is exposed through `aria-activedescendant`, so there is no separate focus state at all: spatial navigation is edge-based (facing-edge gaps with a doubled off-axis penalty, so wide and tall nodes resolve correctly and a near diagonal neighbor beats a far straight one; the opposite arrow returns to where you came from), `Shift`+arrow extends the selection, `Ctrl`+arrow walks the topology (the connection is focused and selected first — so `Delete` works on it — then the node on the other end), `Ctrl`+`A`/`Escape` complete the selection keys, `Space` moves the selection both ways — hold it and arrow, release to drop (a quasimode with no state to forget), or tap to grab and tap to drop for users who cannot chord keys (`Shift` for coarse steps, `Escape` reverts, the drop emits `fMoveNodes`), `C` starts a connection from the selected node (exactly one node must be selected) through the shared `FCreateConnectionSession` (arrows move between connectable targets spatially with the usual preview and snapping, `Enter` emits `fCreateConnection`, `Escape` cancels), `Delete`/`Backspace` emits the new `fDeleteSelected: FDeleteSelectedEvent` (the library never mutates the graph), and `+`/`-`/`0` zoom. Native interactive content inside nodes (inputs, textareas, selects, buttons, links) is never hijacked, and single-key shortcuts respect OS modifiers (`Ctrl`+`C` stays copy). `provideFFlow(withA11y(...))` tunes the layer: `keyboard: false`, `moveStep`/`coarseMoveStep`, a fully localizable message catalog (`IFA11yMessages`), and per-action key bindings (`IFA11yKeys` — e.g. `keys: { connect: ['n'], deleteSelected: [] }`; an empty array disables an action). The selected style is the single visual state — the host's own focus ring is transparent (repainted with system colors in Windows High Contrast, so forced-colors users keep an indicator); keyboard navigation auto-pans off-screen nodes into view (WCAG 2.4.11). Ships the `Accessibility` example (`/examples/accessibility`).
+- **connection-flow:** click-to-connect now obeys the same public gates as the drag gesture — `fDraggableDisabled` and the `createConnection` trigger of the active control scheme; the Safari remnant-ink canvas repaint after a connection drop now runs only on WebKit, other engines skip the synchronous layout flush.
+- **connection-flow:** add `withConnectionFlow(...)` for `provideFFlow(...)` — a provider feature that selects the connection-creation gesture. `'click'` installs click-to-connect: click a source connector to arm a connection, the preview line follows the cursor with no button held, click a connectable target to commit; `Escape` or clicking anything else cancels, and clicking another source re-arms from it. Drag-to-connect keeps working alongside, and passing a custom `Type<IFConnectionFlow>` installs your own gesture. Both gestures drive the new `FCreateConnectionSession` — the connection-creation engine extracted from the drag handler (`begin`/`update`/`resolveTarget`/`complete`/`cancel`) that owns the preview line, snap highlighting, connectable marking, target resolution and the `fCreateConnection` emission — so validation, snapping and the emitted event are identical in every mode, and custom strategies get them for free. Ships the `Click to Connect` example (`/examples/click-to-connect`).
+- **examples:** add the `Control Schemes` example (`/examples/control-schemes`) that switches between the default, Miro-like and draw.io-like presets at runtime, and a `Control Scheme` guide under `/docs/control-scheme`.
+- **diagnostics:** dev-mode diagnostics with stable `FFxxxx` codes linking to the new `/docs/errors` reference. `FF1001` warns when a `<f-connection>` endpoint id matches no rendered connector — the most common silent failure — listing the registered connector ids (suppressed during progressive rendering, deduplicated per connection). `FF1002` warns when the `f-flow` host has zero height (invisible flow). `FF1003` replaces the bare `NullInjectorError` for a connector placed outside `[fNode]` / `[fGroup]` with an actionable error. `FF1004` detects flow content that Angular did not project into the canvas — nodes/groups/connections inside nested `@if`/`@for` blocks register but render detached and invisible with no error; the warning names the item and the exact `<ng-container ngProjectAs="[fNodes]">` / `"[fGroups]"` / `"[fConnections]"` fix. Five more checks mined from recurring support issues run after each settled nodes change via a dedicated `RunDevDiagnostics` execution: `FF1005` — interaction features (`fDragHandle`, `f-selection-area`, `f-connection-for-create`, resize/rotate handles) present without `fDraggable` on `<f-flow>`; `FF1006` — a connector hidden with CSS (`display: none`) whose geometry collapses to a 0×0 point; `FF1007` — an `fNode` element nested inside another node element; `FF1008` — `fNodeParentId`/`fGroupParentId` referencing an id no rendered group has (lists registered ids); `FF1009` — `fitToScreen()`/`resetScaleAndCenter()`/`centerGroupOrNode()` called before the nodes were rendered (the helpers compute from the nodes bounding box, so `(fNodesRendered)` is the earliest safe moment; `(fFullRendered)` also works). The `FF1001` message now also recognizes ids that look like unevaluated template expressions (`node.outputId`) and suggests the missing property-binding brackets. Warnings are stripped from production builds via `ngDevMode`. Also adds JSDoc to the previously undocumented `FNodeBase` and `FConnectorBase` public members, so the published `.d.ts` documents `fNodePosition`, `fNodeSize`, group auto-sizing options, and connector semantics.
+- **ng-add:** `ng add @foblex/flow` now writes a marker-delimited Foblex Flow section into the workspace `AGENTS.md` (created if missing) pointing AI coding agents at the version-matched guide bundled in the package (`node_modules/@foblex/flow/AI.md`), the hosted `llms.txt` / `llms-full.txt`, and the `FFxxxx` error reference. Re-running refreshes only the managed block; opt out with `--skip-agent-rules`.
+- **ai-docs:** refresh the LLM-facing docs to the current API — `llms-full.txt` gains reflow (`withReflowOnResize`, `FReflowController`, `fReflowIgnore`), canvas layer ordering (`EFCanvasLayer`, `[fLayers]`, `withFCanvas`) and the current version; the bundled `AI.md` now covers the unified `fConnector`, `fSourceId`/`fTargetId`, provider features, a minimal three-file working setup and a silent-failure checklist. A new `scripts/validate-llms-content.mjs` check (part of `seo:check`/prebuild) fails the build when the llms files drift from the package version, docs pages, or key API symbols. New `/docs/ai` page documents all agent channels; the quickstart now includes the required `imports: [FFlowModule]` snippet; READMEs and robots.txt link the LLM docs.
+
+### ⚠ Breaking changes
+
+- **a11y:** every flow now applies ARIA semantics by default — nodes/groups/connections gain `role`, `aria-roledescription`, a DOM `id` when they have none, and (for connections) a generated `aria-label`; any attribute you set yourself wins. These are inert attributes: no behavior changes without opting into the keyboard layer via `withA11y()` (only then does the host gain `tabindex="0"`, `role="application"` and the keyboard instructions).
+- **f-draggable:** `FDraggableBase` has two new abstract members — the `fDeleteSelected` output and the `fCreateConnectionTrigger` gate. This only affects code that subclasses `FDraggableBase` directly; templates and the `FDraggableDirective` API are unaffected.
+
+### Fixes
+
+- **f-draggable:** a native `<select>` dropdown (or any OS-level popup) opened from inside a node swallows the `pointerup` that ends a drag sequence, leaving the document listeners armed — the next mouse move then started a phantom drag that glued the node (or canvas) to the cursor with no button pressed, recoverable only by an unrelated click. A buttonless `mousemove` is now treated as the missed `pointerup`: an in-progress drag is finalized at the last position the button was actually held at, and the sequence ends. Reproducible in the Custom Nodes example via its embedded select.
+
+- **f-draggable:** anchor a drag to the pointer-down position instead of the point where the drag threshold was crossed, and apply that threshold-crossing move within the same event. `prepareDragSequence()` previously ran against the `pointermove` that crossed the 3px threshold, so `onPointerDownPosition` was captured several px away from the grab point. On a fast flick (cursor moved far within one frame) this offset the dragged item from the cursor for the whole drag and delayed the first visible move to the next `pointermove` — a 20–50px lag/jump. The shared drag base now prepares against the original pointer-down event and applies the first move immediately, so node dragging, canvas panning, resize, rotate, and connection creation all track the cursor from the first frame with the grab point preserved. Fixes [#309](https://github.com/Foblex/f-flow/issues/309).
+- **f-connection:** stop hover flicker while dragging. When a connection is being created or reassigned, the pointer often rides the edge of a connection path (the preview line ends at the cursor), so hover hit-testing flipped between the path and the background every frame — flickering `:hover` styles and the cursor. Connections take no part in drop targeting, so their hit targets (`.f-connection-group`, the stroke paths, waypoint handles) now give up pointer events for the duration of any drag (`f-dragging` / `f-connections-dragging` on the flow host) and restore them on release.
+- **create-connection:** force the canvas compositing layer to repaint once when the connection preview is hidden on drop. The preview line is painted by an `<svg overflow: visible>` inside a zero-size host, and Safari/WebKit does not invalidate the ink painted outside that box on `display: none`, so the preview line — often several accumulated frames of it — stayed painted on the canvas after a drop that created no connection, until an unrelated repaint (e.g. moving the pointer off the flow) occurred. `f-canvas` owns the compositing layer the ink is rasterized into, so toggling it out of and back into the render tree re-rasters the layer and clears the remnant; the toggle is synchronous, so the canvas size is unchanged by the end of the frame and no `ResizeObserver` fires. Chrome invalidates the full region on hide and was unaffected. Fixes [#311](https://github.com/Foblex/f-flow/issues/311).
+
+## [18.6.1](https://github.com/Foblex/f-flow/compare/v18.6.0...v18.6.1) (2026-05-14)
+
+### Fixes
+
+- **connection-content:** stop reading `getBoundingClientRect()` inside the label placement loop. Each `fConnectionContent` directive now installs a `ResizeObserver` on its host element and reports its size via the cached value, instead of forcing a synchronous layout flush per label on every connection redraw. At a few hundred labelled connections the old read/write loop became O(N²) browser work and froze drag; the hot path now performs zero DOM reads on label hosts. Fixes [#304](https://github.com/Foblex/f-flow/issues/304).
+- **reflow:** stop the reflow orchestrator from planning shifts against half-applied node state. When `withReflowOnResize()` is paired with a group that uses `fAutoSizeToFitChildren` and the graph is swapped in (e.g. by replacing the `@for` source), several children of the group used to collapse onto a single DOM-measured position because the orchestrator built its plan from candidates whose `position()` signal had not yet been mirrored into `_position`. Candidates whose model and mirror are out of sync are now skipped for that tick — the orchestrator resumes once the next coherent state arrives. Fixes [#305](https://github.com/Foblex/f-flow/issues/305).
+
+## [18.6.0](https://github.com/Foblex/f-flow/compare/v18.5.0...v18.6.0) (2026-04-26)
+
+### Highlights
+
+- **Smart Auto-Layout on Resize** — the new `withReflowOnResize` plugin watches every node's size and shifts surrounding nodes the moment one grows or shrinks, so dynamic layouts stay clean without a manual relayout call. The behaviour is configurable via five orthogonal knobs (mode, scope, axis, delta source, collision) plus a `FReflowController` for runtime overrides and an `fReflowIgnore` directive for nodes that must stay pinned.
+- **Layer Ordering** — the order of the three built-in canvas layers (groups, connections, nodes) is now configurable. Pass `[fLayers]` per canvas, or set the app-wide default through `withFCanvas({ layers })` inside `provideFFlow(...)`. The default stays groups → connections → nodes, so existing apps are unaffected.
+
+### Features
+
+- **reflow:** add the `withReflowOnResize` provider feature plus `FReflowController`, `fReflowIgnore` directive, and a planner that combines mode (CENTER_OF_MASS / X_RANGE / DOWNSTREAM_CONNECTIONS), scope (GLOBAL / GROUP / CONNECTED_SUBGRAPH), axis (BOTH / VERTICAL / HORIZONTAL), delta source (EDGE_BASED / CENTER_BASED), and collision (STOP / CHAIN_PUSH) into one declarative reflow plan.
+- **canvas:** add the `EFCanvasLayer` enum, the `[fLayers]` input on `<f-canvas>`, and the `withFCanvas({ layers })` provider feature for app-wide layer ordering. Per-canvas input takes precedence over the provider value; missing layers fall back to their default position; unknown values and duplicates are silently dropped.
+- **examples:** add seven dedicated `/examples/reflow-on-resize` sub-demos covering the basic case and each knob (mode, scope, collision, delta source, axis, runtime controller).
+- **examples:** add `/examples/canvas-layers` with three buttons that promote groups, connections, or nodes to the top while preserving the relative order of the other two layers.
+
+### Documentation
+
+- Add `examples/reflow-on-resize` page with live demos for each knob and a runtime controller walkthrough.
+- Add `examples/canvas-layers` page describing both `[fLayers]` and `withFCanvas({ layers })` and the precedence between them.
+
+### ⚠ BREAKING CHANGES
+
+- **virtualization:** removed the `fVirtualForTrackBy` input on `*fVirtualFor`. The input was declared but never wired into the directive's rendering path, so providing a `trackBy` function had no effect. Templates that reference it must drop the expression (e.g. `*fVirtualFor="let item of items(); trackBy trackFn;"` → `*fVirtualFor="let item of items();"`). No runtime behavior changes — identity reconciliation was never actually performed.
+
+## [18.5.0](https://github.com/Foblex/f-flow/compare/v18.4.0...v18.5.0) (2026-04-14)
+
+### Highlights
+
+- **Workspace reorganized around Nx apps/libs** - the repository now uses independent `apps/*` and `libs/*` projects instead of the older flat workspace layout, which makes example apps, portal builds, and package publishing easier to reason about.
+- **Layout engine support expanded** - Foblex Flow now ships a shared layout-engine abstraction, published Dagre and ELK adapters, and dedicated manual plus auto-layout examples for both engines.
+- **Render lifecycle became explicit** - `fNodesRendered` and `fFullRendered` are now emitted separately, with the internal flow render lifecycle extracted into dedicated handlers instead of staying embedded in `FFlowComponent`.
+- **Reference apps were rebuilt as standalone Angular apps** - Schema Designer, UML Diagram, Tournament Bracket, and Call Center Flow now live under `apps/example-apps/*`, have dedicated portal pages, and can be built or served independently.
+- **Cypress coverage was extended around editor interactions** - regression tests now cover palette node creation, assign-node-on-drop flows, connector side behavior, resize-linked redraws, and drag-to-group scenarios.
+- **Connection worker internals were decomposed and hardened** - the worker-backed redraw path was split into smaller pipeline pieces and kept integrated inside the broader connection redraw system.
+
+### Features
+
+- Add the core layout-engine integration surface plus `provideFLayout(...)`.
+- Publish `@foblex/flow-dagre-layout` and `@foblex/flow-elk-layout`.
+- Add Dagre and ELK examples in both direct-layout and auto-layout variants.
+- Add `fNodesRendered` and `fFullRendered` outputs for finer-grained flow render lifecycle tracking.
+- Ship built-in connection markers and keep connection redraw fully inside the main `f-flow` package.
+- Add standalone reference apps for schema design, UML architecture diagrams, tournament brackets, and call-center IVR routing.
+
+### Improvements
+
+- Split the old examples workspace into independently buildable Nx projects, including standalone example apps and portal-driven embeds.
+- Automate portal prerender route generation, sitemap generation, and embedded-page verification in the portal toolchain.
+- Standardize portal reference-app previews, markdown example pages, and per-app `README.md` files for the standalone examples.
+- Expand end-to-end regression coverage for interaction-heavy example scenarios.
+- Decompose the connection-worker redraw flow into smaller worker/runtime/pipeline units without removing the worker-backed strategy itself.
+
+### Fixes
+
+- Correct group bounds calculations and flow surface sizing so grouped layouts and viewport sizing stay in sync.
+- Stop exporting testing helpers from the published primary package so runtime bundles no longer pull `TestBed` / `@angular/core/testing`, which restores compatibility with Native Federation and similar microfrontend setups.
+
+### Documentation
+
+- Add and refresh standalone example documentation for Schema Designer, UML Diagram, Tournament Bracket, and Call Center Flow.
+- Update the main README, examples overview, and portal metadata to reflect layout-engine demos and the expanded reference-app lineup.
+
+## [18.4.0](https://github.com/Foblex/f-flow/compare/v18.3.0...v18.4.0) (2026-04-02)
+
+### Highlights
+
+- **Home page hero flow redesigned** - the landing page now uses a richer, modular flow showcase with dedicated hero nodes, connectors, and refreshed showcase copy.
+- **Default SCSS theme shipped for Foblex Flow** - the package now exposes a ready-to-use theme entrypoint, domain mixins, and public `--ff-*` tokens for nodes, groups, connectors, connections, plugins, and external items.
+- **Auto-pan shipped as an opt-in flow plugin** - `f-auto-pan` now extends supported drag sessions with edge-based viewport panning and a dedicated example/docs page.
+- **Examples portal controls refreshed** - the examples UI now uses reusable toolbar/overlay primitives plus dedicated native input/select components instead of one-off Material form controls.
+- **Rounded connector geometry hardened** - worker payload generation, rotated intersection math, and corner-radius normalization were updated so rounded connectors behave more predictably across drag, resize, and redraw flows.
+- **Trackpad pinch-to-zoom smoothed** - wheel-based gesture zoom now follows trackpad deltas more closely instead of snapping to the mouse-wheel minimum step.
+- **Installation docs aligned across Angular, Nx, and manual setup** - install sections now describe `ng add`, `nx g @foblex/flow:add`, and explicit companion-package installation consistently across README, guides, and blog tutorials.
+- **Undeclared CDK runtime dependency removed** - `fConnectionContent` now uses a local number coercion helper instead of importing `@angular/cdk/coercion`.
+
+### Features
+
+- **hero-flow:** replace the previous home page background implementation with a dedicated hero flow system composed from reusable node, wrapper, and connector components.
+- **theme:** add a shipped `@foblex/flow/styles/default` entrypoint, public SCSS mixins, token layers, and packaged style assets for selective or full-theme usage.
+- **auto-pan:** add the `f-auto-pan` plugin, drag-session runtime support, unit coverage, Cypress coverage, and a dedicated example for edge-triggered viewport panning during drag.
+- **examples-portal:** add reusable example toolbar/overlay/input/select primitives and move shared example control styling onto the new theme-aligned defaults.
+
+### Improvements
+
+- Migrate examples and guides off the old shared `_flow-common.scss` helper toward the new public theme API and token surface.
+- Update `ng add` to append the default theme stylesheet automatically for application projects, and align package metadata with the documented setup path.
+- Replace ad-hoc Material select/form-field usage in affected examples with the new portal UI controls and shared styling tokens.
+- Refresh showcase taxonomy and example chrome so portal pages present a cleaner, more consistent visual system.
+- Remove stale repository/docs leftovers after retiring the old changelog bundle tooling and the deprecated multiple-flows example.
+
+### Fixes
+
+- **connection-worker:** fall back from worker-based floating geometry for rounded connectors instead of producing incorrect intersections for unsupported shapes.
+- **connections:** calculate floating intersections against rotated rounded connectors during redraw, create, reassign, drag, and resize flows.
+- **connectors:** normalize oversized corner radii before connector geometry is used for rounded intersection calculations.
+- **connection-content:** remove the runtime dependency on `@angular/cdk/coercion` by replacing it with a local number coercion helper.
+- **zoom:** smooth wheel-based pinch-to-zoom on trackpads by separating gesture-wheel normalization from mouse-wheel stepping.
+
+### Documentation
+
+- Normalize install docs across README, guides, and blog tutorials so Angular, Nx, and manual installation paths use the same dependency story.
+- Sync install-related package metadata and schematic companion dependency versions with the documented setup commands.
+- Expand styling documentation with dedicated guides for mixins/scoping, token overrides, and practical styling recipes, and add the new pages to docs navigation, prerender routes, and sitemap.
+- Add a dedicated `v18.4.0` release article, document `f-auto-pan` in the guides and examples, and remove the obsolete markdown page for the deleted multiple-flows demo.
+
+### ⚠️ Breaking Changes
+
+#### Canvas dragging host class was renamed
+
+Use `.f-canvas-dragging` instead of `.canvas-dragging` in custom styles and examples.
+
+The legacy `.canvas-dragging` class is still emitted for compatibility in `18.4.0`, but it is now deprecated and should be treated as transitional only.
+
+### Migration Notes
+
+Update CSS selectors:
+
+```scss
+/* Old */
+f-canvas.canvas-dragging {
+
+}
+
+/* New */
+f-canvas.f-canvas-dragging {
+
+}
+```
+
+## [18.3.0](https://github.com/Foblex/f-flow/compare/v18.2.0...v18.3.0) (2026-03-17)
+
+### Highlights
+
+- **Projected connection gradients** - gradient strokes are now opt-in through projected `f-connection-gradient` config instead of always living on the connection component itself.
+- **Connection redraw work reduced** - unchanged connections now skip redundant marker generation and repeated line re-initialization when their render signature stays the same.
+- **Connection worker production loading fixed** - production bundles now start the connection worker from a blob URL instead of requesting `worker/f-connection.worker.ts`, avoiding MIME type failures on deployed apps.
+- **Docs, examples, and roadmap updated** - the custom connection example, connection guides, and roadmap docs now reflect the projected gradient model and the recent release history.
+
+### Improvements
+
+- Gradient DOM identifiers now stay stable per connection instance, even when a connection is reassigned to different source or target connectors.
+- Gradient rendering now avoids unnecessary DOM writes for unchanged coordinates and colors.
+- Connection marker rendering now skips redundant regeneration when the effective marker inputs have not changed.
+- Connection redraw caching now short-circuits repeated `setLine()` / `initialize()` work for unchanged routes and waypoint state.
+
+### Fixes
+
+- **connection-worker:** production builds now inline the worker runtime via `Blob` and `URL.createObjectURL`, which removes requests for `worker/f-connection.worker.ts` and the related MIME type error.
+
+### Documentation
+
+- Updated `f-connection`, `f-connection-for-create`, and `f-snap-connection` guides to document projected gradient usage.
+- Updated the connection gradients example page to explain when and why projected gradients should be used.
+- Rebuilt the roadmap documentation around release history and added a dedicated roadmap markdown page to the docs navigation.
+- Added a dedicated `v18.3.0` release article covering projected gradients, redraw caching, and production worker hardening.
+
+### ⚠️ Breaking Changes
+
+#### Connection gradient colors moved off the connection components
+
+Gradient colors are no longer configured directly on:
+
+- `f-connection`
+- `f-connection-for-create`
+- `f-snap-connection`
+
+Use projected `f-connection-gradient` instead.
+
+### Migration Notes
+
+Move gradient colors from the connection inputs to the projected gradient config:
+
+```html
+<!-- Old -->
+<f-connection
+  fOutputId="out-1"
+  fInputId="in-1"
+  fStartColor="#4f46e5"
+  fEndColor="#06b6d4"
+></f-connection>
+
+<!-- New -->
+<f-connection fOutputId="out-1" fInputId="in-1">
+  <f-connection-gradient
+    fStartColor="#4f46e5"
+    fEndColor="#06b6d4"
+  ></f-connection-gradient>
+</f-connection>
+```
+
+## [18.2.0](https://github.com/foblex/flow/compare/v18.1.0...v18.2.0) (2026-03-09)
+
+### Highlights
+
+- **Zoom during drag-and-drop** - wheel zoom now stays available during active drag interactions instead of being blocked for the whole drag session ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **Connection rendering pipeline refresh** - added optional flow caching, worker-assisted connection calculation, and chunked redraws for large diagrams ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **Drag-and-drop interactions reworked** - refactored external item, minimap, resize, rotate, and related connection flows ([2019ea4](https://github.com/foblex/flow/commit/2019ea41), [77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **Public API growth** - exported `f-cache`, `f-virtual`, and `f-connection-worker` ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **Examples and docs refresh** - standardized example structure, rebuilt pro examples, and expanded Cypress coverage ([c58fd1f](https://github.com/foblex/flow/commit/c58fd1fb), [f231423](https://github.com/foblex/flow/commit/f2314233), [454a323](https://github.com/foblex/flow/commit/454a3237)).
+
+### Features
+
+- **flow/cache:** add `fCache` input on `f-flow` and a new public `f-cache` module with cache providers, registration, invalidation, and cached rect helpers ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **connection-worker:** add worker-backed connection calculation and expose `f-connection-worker` ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **virtualization:** add `fVirtualFor` for progressive rendering of large projected node lists ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **minimap:** add `fNodeRenderLimit` to skip expensive minimap rendering for very large scenes ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **resize-node:** keep dependent connections in sync while resizing nodes, including soft-parent scenarios ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **drag-and-drop:** improve external item handling, pointer normalization, and create-node/drop-to-group integration ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **zoom/drag-and-drop:** allow wheel zoom during active drag sessions by rebasing drag context for node drag, external item drag, resize, rotate, connection create/reassign, waypoint drag, and container assignment ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+
+### Improvements
+
+- Separated node and connection change streams, added debounced layer sorting, and chunked connection redraws ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- Improved zoom behavior during supported drag-and-drop flows, with direct support for canvas drag and selection-area interactions and drag-context rebasing for node, external-item, resize, rotate, connection, waypoint, and container-assignment flows ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- Improved connection context resolution and cache reuse across redraws, node drag, and resize flows ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- Reworked minimap, external item, resize, and rotate handler architecture for more consistent internal interaction flow ([2019ea4](https://github.com/foblex/flow/commit/2019ea41)).
+- Standardized example authoring, lazy imports, markdown embeds, and example style checks ([f231423](https://github.com/foblex/flow/commit/f2314233)).
+- Rebuilt the UML architecture demo with signal-based Angular state and modularized the tournament bracket pro example ([454a323](https://github.com/foblex/flow/commit/454a3237)).
+- Expanded Cypress regression coverage for interactions and examples ([c58fd1f](https://github.com/foblex/flow/commit/c58fd1fb)).
+
+### Fixes
+
+- **flow:** correct node padding tuple order used for child bounding calculations ([1ef5bb4](https://github.com/foblex/flow/commit/1ef5bb43)).
+- **zoom:** use the dominant wheel axis so Shift + wheel / horizontal wheel zoom behaves correctly ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **selection:** simplify selectable rectangle calculations and remove stale scaling dependencies ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+- **minimap:** batch SVG drawing and clear the canvas when rendering is intentionally skipped ([77673e3](https://github.com/foblex/flow/commit/77673e3c)).
+
+### Documentation
+
+- Updated multiple guides and example pages to match the new example structure and API naming ([f231423](https://github.com/foblex/flow/commit/f2314233)).
+- Refreshed stress test example descriptions and example metadata to document cache, virtualization, connection toggles, routing modes, and marker-heavy rendering scenarios ([f231423](https://github.com/foblex/flow/commit/f2314233)).
+
+### ⚠️ Breaking Changes
+
+#### External Item directive class names were renamed
+
+Examples had to update their imports from `@foblex/flow`:
+
+- `FExternalItemDirective` -> `FExternalItem`
+- `FExternalItemPlaceholderDirective` -> `FExternalItemPlaceholder`
+- `FExternalItemPreviewDirective` -> `FExternalItemPreview`
+
+### Migration Notes
+
+Update imports:
+
+```ts
+import {
+  FExternalItemDirective,
+  FExternalItemPlaceholderDirective,
+  FExternalItemPreviewDirective,
+} from '@foblex/flow';
+```
+
+to:
+
+```ts
+import {
+  FExternalItem,
+  FExternalItemPlaceholder,
+  FExternalItemPreview,
+} from '@foblex/flow';
+```
+
+## [18.1.0](https://github.com/foblex/flow/compare/v18.0.0...v18.1.0) (2026-02-16)
+
+### Highlights
+
+- **Magnetic alignment extensions** - added `f-magnetic-lines` and `f-magnetic-rects` plugins with dedicated examples.
+- **Connection interactions reworked** - new create/reassign connection drag flows and updated waypoint drag handlers.
+- **Draggable infrastructure refresh** - unified handler architecture and improved pointer-based selection behavior.
+- **Public API growth** - exported magnetic plugins and testing utilities from `public-api`.
+
+### Features
+
+- **magnetic-lines:** add magnetic line management features ([8a48f35](https://github.com/foblex/flow/commit/8a48f35a))
+- **magnetic-rects:** implement magnetic rects functionality ([7d37007](https://github.com/foblex/flow/commit/7d370075))
+- **drag-handler:** add `kind` property support in handlers ([1a642fd](https://github.com/foblex/flow/commit/1a642fdb))
+- **examples:** add AI low-code platform example ([4ad841b](https://github.com/foblex/flow/commit/4ad841b5))
+
+### Improvements
+
+- Refactored storage internals to registries (`FConnectorRegistry`, connection/node/marker registries) for more consistent component lifecycle handling ([6b40453](https://github.com/foblex/flow/commit/6b404536), [be42f88](https://github.com/foblex/flow/commit/be42f88d), [13a2b32](https://github.com/foblex/flow/commit/13a2b32f), [05d8bf6](https://github.com/foblex/flow/commit/05d8bf67), [8988370](https://github.com/foblex/flow/commit/8988370c))
+- Reworked selection and selection-area flow to improve pointer handling and interaction predictability ([ba716d2](https://github.com/foblex/flow/commit/ba716d28), [4158d34](https://github.com/foblex/flow/commit/4158d340))
+- Performed broad naming and structure cleanup for draggable/connection modules to improve maintainability ([3af7539](https://github.com/foblex/flow/commit/3af75392), [3253671](https://github.com/foblex/flow/commit/3253671b), [9ecf603](https://github.com/foblex/flow/commit/9ecf6034), [989ba17](https://github.com/foblex/flow/commit/989ba17e), [cb5b883](https://github.com/foblex/flow/commit/cb5b883d), [dd58542](https://github.com/foblex/flow/commit/dd585426))
+- Extended public API exports with `f-magnetic-lines`, `f-magnetic-rects`, and `testing` modules ([08a864c](https://github.com/foblex/flow/commit/08a864cf))
+
+### Documentation
+
+- Updated multiple guides/components docs for consistency and removed outdated sections ([99af791](https://github.com/foblex/flow/commit/99af7915), [83d8882](https://github.com/foblex/flow/commit/83d8882e))
+- Updated draggable-flow demo docs/layout for better responsiveness and clearer interaction examples ([1115ecf](https://github.com/foblex/flow/commit/1115ecf8))`
+
+## [18.0.0](https://github.com/foblex/flow/compare/v17.9.5...v18.0.0) (2026-01-26)
+
+### Highlights
+
+- **Connection Waypoints (new feature)** — interactive waypoint editing for connections with candidate points and drag-and-drop.
+- **Pinch-to-zoom (new feature)** — smooth multi-touch zoom for trackpads and touch devices.
+- **Control Flow + Content Projection compatibility** — improved support for `@if/@for` rendering by extending projection slots for nodes/connections.
+- **Custom Backgrounds** — richer SVG pattern support plus a new example for advanced backgrounds.
+
+### Features
+
+- **zoom:** add pinch-to-zoom support for touch/trackpad gestures ([5dfeeb5](https://github.com/foblex/flow/commit/5dfeeb5f16dcf9dfbcf4ee38dfea22ded1c37f83))
+- **connection:** introduce **waypoints** with candidates + drag-to-add / drag-to-move interactions and demo example ([19772df](https://github.com/foblex/flow/commit/19772df7649e66b4115bd6a057613d3fa25faeec), [229d6e3](https://github.com/foblex/flow/commit/229d6e3b773a64a1e55654c373e3b556a8d38c8e))
+- **connection:** add anchors utility and refactor connection builders + candidate generation ([3276baf](https://github.com/foblex/flow/commit/3276baf8405eec062022b285524e3c641d901424), [b18109a](https://github.com/foblex/flow/commit/b18109a2c26fdac7aa8e5980fb5bbd791d3a4b42))
+- **canvas:** improve content projection for Angular Control Flow usage (`@if/@for`) by supporting grouped slots (`[fNodes]`, `[fConnections]`) ([b18109a](https://github.com/foblex/flow/commit/b18109a2c26fdac7aa8e5980fb5bbd791d3a4b42))
+- **background:** support custom/complex SVG patterns + add a dedicated example ([29e28c8](https://github.com/foblex/flow/commit/29e28c81faf9da5189d9bf108323f4f4deb9387d))
+- **showcase:** add AI Low Code Platform entry and links ([6013ee7](https://github.com/foblex/flow/commit/6013ee7c23f5d88d8861027b56618b4bffc9fce2), [dd84ae8](https://github.com/foblex/flow/commit/dd84ae8730d8296a56d47ce5fb4966cc4de55e4b))
+
+### Improvements
+
+- Refactored multiple connection/interaction modules to improve readability, maintainability and internal consistency.
+- Candidate/waypoint handling is now more predictable across all connection types.
+
+### Documentation
+
+- fix url to custom-connection-type component in guide ([a6421ac](https://github.com/foblex/flow/commit/a6421aca5fd3ba2576a7f155e5ad8b06c5af9ed7))
+
+### ⚠️ Breaking Changes
+
+#### 1) Custom connection builders: `IFConnectionBuilderResponse` updated
+
+If you implemented a custom connection type / builder, the response interface changed:
+
+- `connectionCenter` was **removed**
+- `points` is now **required** (was optional)
+- `candidates` was **added**
+
+✅ **Note:** you don’t have to calculate or return `points` or `candidates` yourself.  
+If you don’t support them, return empty arrays.
+
+```ts
+export interface IFConnectionBuilderResponse {
+  path: string;
+  penultimatePoint: IPoint;
+  secondPoint: IPoint;
+  points: IPoint[];      // can be []
+  candidates: IPoint[];  // can be []
+}
+```
+
+#### 2) FConnection API cleanup: removed deprecated inputs
+
+Deprecated connection inputs were removed from FConnectionComponent:
+
+- `fText` - removed (use FConnectionContent instead)
+- `fTextStartOffset` - removed (use FConnectionContent instead)
+
+Removed legacy directive:
+
+- [fConnectionCenter] - removed (use FConnectionContent instead)
+
+#### 3) FCanvas API cleanup
+
+Removed deprecated zoom aliases from FCanvasComponent:
+
+- setZoom(...) - removed → use setScale(...)
+- resetZoom() - removed → use resetScale()
+
+### [17.9.5](https://github.com/foblex/flow/compare/v17.8.0...v17.9.5) (2025-10-27)
+
+### Features
+
+- **Connection Connectable Side**
+  - Added connectable-side calculation modes (manual & automatic).
+  - Updated documentation and example to demonstrate both connection-side strategies.
+    ([00b4d56](https://github.com/foblex/flow/commit/00b4d56cd9bdb64e2b31ea352fc1420f924a4f28),
+    [7def789](https://github.com/foblex/flow/commit/7def789fc1312f1667c2822ec21655fb4c85f96a),
+    [8180976](https://github.com/foblex/flow/commit/818097663f42e9eb3662d76a8c059da0ab6c1a87))
+
+- **Connection Rendering Improvements**
+  - Introduced `AdaptiveCurveBuilder` and updated connection type examples.
+    ([0f1448a](https://github.com/foblex/flow/commit/0f1448af8d48b2e70d4d76ed24e409f2573d125b))
+
+- **Performance Enhancements**
+  - Improved performance for large-scale node dragging and stress testing scenarios.
+    ([0fc9da4](https://github.com/foblex/flow/commit/0fc9da40f711e15b5d4439f69403642d914ccbf3))
+
+- **Examples / Documentation**
+  - Enhanced 404 fallback page routing and rendering behavior.
+    ([72cfdc5](https://github.com/foblex/flow/commit/72cfdc5b6bf017713036f8b52b588d04f00b3b51))
+
+### Bug Fixes
+
+- **Rendering Stability**
+  - Optimized connection rendering and recalculation logic for smoother updates.
+  - Fixed Safari macOS issue where connection paths could render partially clipped.
+  - Improved zoom performance by reducing unnecessary layout thrashing.
+    ([e6a7321](https://github.com/foblex/flow/commit/e6a732125be2db2bc09e817c7dd1744ae22a2016))
+
+- **Canvas Drag Handling**
+  - Added / restored `will-change` and `transform` properties for smoother dragging.
+    ([f40a1ec](https://github.com/foblex/flow/commit/f40a1ec32ba99c90fa6d792cacc031899f8eeb1d),
+    [3800230](https://github.com/foblex/flow/commit/38002304df6e48d87f902b5b6331d17177951489))
+
+- **Node Positioning**
+  - Enforced absolute layout positioning for nodes and groups.
+    ([b03a611](https://github.com/foblex/flow/commit/b03a6115bd82c0b4ce45ffafed083cb45d4a858f))
+
+- **Content Selection Behavior**
+  - Fixed unintended selection inside connections.
+    ([633ff5f](https://github.com/foblex/flow/commit/633ff5f892a80e6d1c5e7a3c7414d7d44debfef4))
+
+### Documentation
+
+- Updated supported Angular version from 12 to 15 in documentation.
+  ([467c8e4](https://github.com/foblex/flow/commit/467c8e4d418a53b34e0f92b29739f070d1fb3fe6))
+
+- Improved `FNodeInputDirective` documentation.
+  ([8ef88e1](https://github.com/foblex/flow/commit/8ef88e15ffed51e9c19a671601ba5e7ab2d4852b),
+  [d72a91f](https://github.com/foblex/flow/commit/d72a91facc9b0b7b31a51f54a8fa0bf5707e4c1f))
+
+## [17.8.0](https://github.com/foblex/flow/compare/v17.7.0...v17.8.0) (2025-09-15)
+
+### Features
+
+- **Connection Content** - [Example](https://flow.foblex.com/examples/connection-content)
+  - Added `fConnectionContent` directive for placing custom content (labels, icons, buttons) along connections with position, offset, and alignment options. ([a1cda4a](https://github.com/foblex/flow/commit/a1cda4ab46dc1877d2c6a4a4f8195e3039ff4b97))
+
+- **Connection Validation** - [Example](https://flow.foblex.com/examples/connection-rules)
+  - Extended connection validation rules:
+    - Previously, connections could only be restricted by **input ID** (`fInputId`).
+    - Now, restrictions can also be applied by **input category** (`fInputCategory` — a free string label for grouping).
+    - On the output side, developers can define `fCanBeConnectedInputs`, listing allowed IDs and/or categories.
+    - During drag, the system checks both; only matching inputs are valid targets.
+    - Visual feedback:
+      - `.f-connections-dragging` is applied to the container.
+      - Valid inputs receive `.f-connector-connectable`.
+      - Invalid inputs remain unstyled (example styles dim them).
+    - This gives immediate visual feedback and makes rules more flexible for real-world editors.  
+      ([704333f](https://github.com/foblex/flow/commit/704333f113dde876068436015417030ddc267648), [1977850](https://github.com/foblex/flow/commit/19778509897a8ddf69d8ad4fd12be0e70e258b4c))
+- **UX & Examples**
+  - Added redirects for documentation and examples routes, updated sitemap for new URLs. ([ef941ad](https://github.com/foblex/flow/commit/ef941add180a3fd19b9d7e94ad93a5b975197148))
+  - Introduced Showcase feature with configuration and example items. ([bfc39fc](https://github.com/foblex/flow/commit/bfc39fc02de7b75f3a909d8241db1e6f57fd9d26))
+
+- **Reactivity & Refactors**
+  - Migrated connector IDs and related properties to Angular Signals. ([223460d](https://github.com/foblex/flow/commit/223460de8bd288ece6d6700645e6549f499b9dfb), [9051239](https://github.com/foblex/flow/commit/905123920a68bc145eee6647cdb0a0711c689252), [9cadd41](https://github.com/foblex/flow/commit/9cadd419611d3661747865f2577b8d64ee11787c))
+  - Refactored Dagre Layout example and improved connection handling. ([498a86b](https://github.com/foblex/flow/commit/498a86b1b2601338733cdad5a19d95105af5e5e9))
+
+### Deprecations
+
+- Marked `fConnectionCenter` directive and `fText` property as **deprecated**. Use `fConnectionContent` instead. ([8532fba](https://github.com/foblex/flow/commit/8532fba7e87bef005cfad059bd0fe8096cd184ac))
+
+### Bug Fixes
+
+- Updated Angular dependencies to latest patch versions. ([f57f99d](https://github.com/foblex/flow/commit/f57f99de1db36233c8dc716661faf2bf1116313c))
+- Updated edit link patterns in documentation and examples configuration. ([d08f54d](https://github.com/foblex/flow/commit/d08f54d3e4b060c574187130f6c597c58c058269))
+- Fixed image URLs and demo link in `showcase.ts` for local paths. ([3b428b0](https://github.com/foblex/flow/commit/3b428b08abcfe204d47182c789b4cee054e9d872))
+- Added Material Design styles for form fields and select components in test examples. ([0e176b7](https://github.com/foblex/flow/commit/0e176b723a780d6237585c71412463fdffd8ed57))
+
+### Migration Notes
+
+Replace `fText` property:
+
+```html
+  <f-connection ... fText="Label"></f-connection>
+```
+
+with:
+
+```html
+  <f-connection ...>
+    <div fConnectionContent [position]="0.5">Label</div>
+  </f-connection>
+```
+
+Replace `fConnectionCenter directive:
+
+```html
+  <f-connection ...>
+    <div fConnectionCenter>...</div>
+  </f-connection>
+```
+
+with:
+
+```html
+  <f-connection ...>
+    <div fConnectionContent [position]="0.5" align="along">...</div>
+  </f-connection>
+```
+
+---
+
+## [17.7.0](https://github.com/foblex/flow/compare/v17.5.5...v17.7.0) (2025-08-24)
+
+### Features
+
+- **Grouping Improvements**
+  - Refactored the [Grouping Example](https://flow.foblex.com/examples/grouping) and the [Drag-to-Group](https://flow.foblex.com/examples/drag-to-group) Example.
+  - Added **fAutoSizeToFitChildren** — automatically resizes parent nodes and groups to fit the combined size of their children.
+  - Added **fAutoExpandOnChildHit** — expands parent nodes and groups in real time when child nodes are moved inside and do not fit.
+  - Improved drag-to-group behavior: dropping into a node or group that is already part of another parent now correctly validates the target (previously it always defaulted to its existing parent).
+- **New Copy/Paste Example**
+  - [Copy-Paste Example](https://flow.foblex.com/examples/copy-paste) demonstrates how to implement cut, copy, and paste functionality in Foblex Flow.
+  - Shows how to duplicate nodes (with their connections), remove selected elements, and insert them back while keeping IDs and connections consistent.
+- **New Undo/Redo Example**
+  - [Undo-Redo V2 Example](https://flow.foblex.com/examples/undo-redo-v2) demonstrates how to add undo and redo functionality to a flow editor.
+  - Built on top of @foblex/mutator, a lightweight state management utility that tracks state changes, snapshots, and history.
+  - Provides a full time-travel editing experience, allowing users to revert and reapply actions for a smoother workflow.
+
+### 🧹 Improvements
+
+- Grouping internals were refactored and clarified, including renaming of execution classes and better separation of responsibilities.
+
+### 📚 Documentation
+
+- Updated documentation to reflect new features and API changes:
+  - [FNodeDirective](https://flow.foblex.com/docs/f-node-directive)
+  - [FFlowComponent](https://flow.foblex.com/docs/f-flow-component)
+  - [FCanvasComponent](https://flow.foblex.com/docs/f-canvas-component)
+
+### 🐞 Bug Fixes
+
+- resolve drag-and-drop issues on macOS by improving event handling ([#187](https://github.com/foblex/flow/issues/187)) ([142745c](https://github.com/foblex/flow/commit/142745c277736b0c43085dde5c6590eb90ca87f1))
+- smooth wheel zoom ([#198](https://github.com/foblex/flow/issues/198)) ([e302e75](https://github.com/foblex/flow/commit/e302e75a1116ef585eaf0e6e10b2411c059d7777))
+
+### ⚠️ Breaking Changes
+
+- **CSS Class Rename**:
+  - .f-parent-for-drop → .f-grouping-over-boundary
+- **New CSS Class**:
+  - .f-grouping-drop-active — applied to nodes or groups that are valid drop targets for grouping.
+
+If you are using custom styles based on the old .f-parent-for-drop selector, you will need to update your CSS.
+
+### 🔎 TL;DR
+
+- Groups now support auto-resize and auto-expand on child moves.
+- Drag-to-group behavior is more robust.
+- Breaking change: CSS class .f-parent-for-drop renamed.
+- Documentation updated.
+- Two new examples: Copy/Paste and Undo/Redo V2.
+
+## [17.6.0](https://github.com/foblex/flow/compare/v17.5.5...v17.6.0) (2025-07-23)
+
+### Features
+
+- **Improved Connection Reassignment**
+  - Enhanced the logic and UX for reassigning connections, allowing both source and target to be dynamically changed.
+  - Updated class names for clarity and improved drag handle behavior and styling.  
+    ([7aef9f3](https://github.com/foblex/flow/commit/7aef9f3eacc134d1e1c81f66516f4238ae98855d), [bbb6d56](https://github.com/foblex/flow/commit/bbb6d56d35c2b95f8d07f414910a45bd15126a8a), [d8de100](https://github.com/foblex/flow/commit/d8de100cbebfe1c540ad927e0c20b654fedcc0f7))
+
+- **Signal-based Refactors for Reactivity**
+  - Refactored the following to use Angular Signals for more efficient change detection and reactivity:
+    - `fConnectionCenter`  
+      ([421b0ef](https://github.com/foblex/flow/commit/421b0efae24a19c117fd314cbb9cec144384f681), [439760c](https://github.com/foblex/flow/commit/439760c5c1302e16dba7fc0790530225a9e99c63))
+    - `fDefs`, `fTextComponent`  
+      ([06e9457](https://github.com/foblex/flow/commit/06e94574d154f695174083e2f8d39b4141b20b9d))
+    - `fId` across multiple interfaces and components  
+      ([3034d5d](https://github.com/foblex/flow/commit/3034d5d19997020745d870bba61be82a0933a914))
+    - `fPath` logic  
+      ([a1b1314](https://github.com/foblex/flow/commit/a1b131446bc2cb486fcf940458105af1200ae768))
+    - `fSelection` initialization and management  
+      ([31b6af1](https://github.com/foblex/flow/commit/31b6af1bf68623a0942f5084ad7c41b70f34347e))
+
+- **Minimap Improvements**
+  - Restructured the minimap component.
+  - Enhanced input handling and upgraded it to support new Angular features.  
+    ([c7a3be9](https://github.com/foblex/flow/commit/c7a3be936eecaaa10b4da49c3b77a4ff496dae75))
+
+- **Debounced `fCanvasChange` Event**
+  - Added optional debounce to the `fCanvasChange` event in `FCanvasComponent` to reduce event noise during rapid updates.
+  - Configurable via debounceTime input
+- **New `fDragBlocker` Directive**
+  - Introduced fDragBlocker directive to block drag-and-drop interactions within specific areas of the canvas.
+  - Useful for excluding certain zones (like panels or overlays) from initiating node movement or connection creation.
+
+### 🐞 Bug Fixes
+
+- **Drag-and-Drop on macOS**
+  - Fixed issues with drag-and-drop interactions on macOS by improving event handling.  
+    ([#187](https://github.com/foblex/flow/issues/187), [142745c](https://github.com/foblex/flow/commit/142745c277736b0c43085dde5c6590eb90ca87f1))
+
+### ⚠️ Breaking Changes
+
+- **Updated `FReassignConnectionEvent` structure**
+  - The event model was redesigned to support both source and target reassignment with more detailed context.
+
+  **Before:**
+
+  ```ts
+  new FReassignConnectionEvent(
+    fConnectionId: string,
+    fOutputId: string,
+    oldFInputId: string,
+    newFInputId: string | undefined,
+    fDropPosition: IPoint
+  )
+  ```
+
+  **After:**
+
+  ```ts
+  new FReassignConnectionEvent(
+    connectionId: string,
+    isSourceReassign: boolean,
+    isTargetReassign: boolean,
+    oldSourceId: string,
+    newSourceId: string | undefined,
+    oldTargetId: string,
+    newTargetId: string | undefined,
+    dropPoint: IPoint
+  )
+  ```
+
+  This change improves the accuracy of reassignment tracking and enables more flexible behavior in advanced flow editors.
+
+## [17.5.0](https://github.com/foblex/flow/compare/v17.4.0...v17.5.0) (2025-05-11)
+
+### Features
+
+- Added Angular schematics support for `ng-add` and `ng-update` commands. ([ea3e8ec](https://github.com/foblex/flow/commit/ea3e8ec7b8960e4f6de9f37a35dbfe3633b3dd39))
+- Added `fMinimapClass` input for custom minimap node styling. ([7c8e13c](https://github.com/foblex/flow/commit/7c8e13c6ba7c408ea6882600f8c42818f8cfe614))
+- Added membership page components and enhanced flow connection properties. ([6170b46](https://github.com/foblex/flow/commit/6170b460790ed401cdc5029f477177ed6bb52089))
+- Enhanced resize handle functionality with minimum size support and improved styling. ([29fbcd4](https://github.com/foblex/flow/commit/29fbcd4940571141cfab14897c632f9a0c68e468))
+- Implemented node rotation functionality. ([b58f982](https://github.com/foblex/flow/commit/b58f982244fce06bd6d0ae9555a20b4a24db627d))
+
+### Bug Fixes
+
+- Adjusted node positioning calculations to account for transformation scale. ([0295846](https://github.com/foblex/flow/commit/0295846f038297e3780741efe3526e02cad76476))
+- Refactored background component executions to use readonly properties and improve dependency injection. ([a18dddd](https://github.com/foblex/flow/commit/a18ddddec255f888e46f060905edaf1417bdcab9))
+- Refactored canvas components to use readonly properties and introduce mediatorEffect for better state management. ([5c3512b](https://github.com/foblex/flow/commit/5c3512be2a35d36aa4ed326f06a5c05ec4ad69e3))
+- Updated `@foblex/m-render` to version 2.5.9 and incremented package version to 17.4.4. ([c51a174](https://github.com/foblex/flow/commit/c51a1744283a670f371cce361a8cedfa4e46e3f0))
+- Fixed drag handler to correctly append and remove elements; added `pointer-events` to connection styles. ([dcc5de3](https://github.com/foblex/flow/commit/dcc5de3524d87189013bab27c6ecc08c2638bf11))
+- Fixed `f-background` component to use `ContentChild` decorator and improve pattern handling. ([9fb09ba](https://github.com/foblex/flow/commit/9fb09ba6a073d106a6f2feb7010e96a0d718ddcc))
+- Updated node input/output IDs to include index for better connection management. ([95c7691](https://github.com/foblex/flow/commit/95c7691864f0b79ae4551c4c5406ce3f311ada18))
+
+### Documentation
+
+- Added Rotate Handle example. ([1f51f4f](https://github.com/foblex/flow/commit/1f51f4ff8c1e54679dd6cc67138ae574bbc2eb83))
+
+## [17.4.0](https://github.com/foblex/flow/compare/v17.2.1...v17.4.0) (2025-02-10)
+
+### Features
+
+- Added CustomTriggers for fDraggable, fZoom to allow for custom drag and zoom triggers ([34c87b8](https://github.com/foblex/flow/commit/34c87b84fd6ffe9443a61e93c2066f98aae6f1cb))
+- Enhance f-flow components with loading handlers and improved styling ([abd779c](https://github.com/foblex/flow/commit/abd779c9bfdf7469955ce83fedb18759083f6f40))
+- Added fDragStarted with data and fDragEnded events ([4ef0e17](https://github.com/foblex/flow/commit/4ef0e177eb35060d0eb5de2b90f545f7051476a1))
+- Added Connection Validation to prevent connections between incompatible connectors ([4ef0e17](https://github.com/foblex/flow/commit/4ef0e177eb35060d0eb5de2b90f545f7051476a1))
+- Added Grid System for fDraggable to allow for movement in grid increments ([23f39c5](https://github.com/foblex/flow/commit/23f39c556536e8d38e91df134f487c40f1715cc9))
+- Added fEmitOnNodeIntersect event to know when a node is intersected by connection ([23f39c5](https://github.com/foblex/flow/commit/23f39c556536e8d38e91df134f487c40f1715cc9))
+- Refactor styles and components for f-flow integration ([05ada49](https://github.com/foblex/flow/commit/05ada49295eeffbef102c86ead77241ef9a7871b))
+- Added Top, Left, Bottom, Right Resize Handles ([05ada49](https://github.com/foblex/flow/commit/05ada49295eeffbef102c86ead77241ef9a7871b))
+
+### Documentation
+
+- Added StressTestWithConnections example ([7e7e4f5](https://github.com/foblex/flow/commit/7e7e4f5ab402b8cec84fbae5f36ff3bceb5bdd37))
+- Added ConnectabilityCheck examples ([fac0ff1](https://github.com/foblex/flow/commit/fac0ff118f8f1143186f3d29174468af1fff45f1))
+- Added AssignNodeToConnection example ([377b610](https://github.com/foblex/flow/commit/377b6109e6ca65f654f62976fe50b8277d7d542b))
+- Added ConnectionText and CustomConnectionType examples ([eb248c0](https://github.com/foblex/flow/commit/eb248c044bf854a208e4930e405b990a24840328))
+- Added ConnectionCenter examples ([9b7d1ed](https://github.com/foblex/flow/commit/9b7d1edd5b537feeb132e2564e61538c2baa784b))
+- Added AddNodeToPalette example ([d1d2ab9](https://github.com/foblex/flow/commit/d1d2ab999b4f57f17a30c18a9c7b4aa15d6015c2))
+- Added GridSystem example ([ec4cef8](https://github.com/foblex/flow/commit/ec4cef837158f7301b76a56d855a242b63e3c663))
+- Added Undo/Redo example ([82c57cd](https://github.com/foblex/flow/commit/82c57cdf8a018c0f37921756d1801c0b0dc3d980))
+- Added DragStart/EndEvents example ([87daaaa](https://github.com/foblex/flow/commit/87daaaa211360dd9d1b11e0c6a6ac27d93987d1f))
+- Added CustomEventTriggers example ([015865d](https://github.com/foblex/flow/commit/015865d2bf2ba75483fed2c28bacc827d646a116))
+- Updated ResizeHandle example ([6735cf5](https://github.com/foblex/flow/commit/6735cf5dd636dad4838032765f5da862763d6f1f))
+- Updated AutoSnap example ([fcfce91](https://github.com/foblex/flow/commit/fcfce91ea082d503d54f982fd624bded6838e3fc))
+
+## [17.0.1](https://github.com/foblex/flow/compare/v16.0.0...v17.0.1) (2024-12-29)
+
+### Features
+
+- Removed RXJS dependency ([52811e3](https://github.com/foblex/flow/commit/52811e35e1828448c72935384c7e034f35b08461))
+- Positioning support for fText ([52811e3](https://github.com/foblex/flow/commit/52811e35e1828448c72935384c7e034f35b08461))
+
+### Bug Fixes
+
+- IOS issue with recalculate after animation ([369c54d](https://github.com/foblex/flow/commit/369c54debdf2fad87a3cbcb82343aea04d3ac2dc))
+
+### Documentation
+
+- Added AutoSnap example ([7e7e4f5](https://github.com/foblex/flow/commit/7e7e4f5ab402b8cec84fbae5f36ff3bceb5bdd37))
+- Added Background example ([6735cf5](https://github.com/foblex/flow/commit/6735cf5dd636dad4838032765f5da862763d6f1f))
+- Added ConnectionBehaviours examples ([fac0ff1](https://github.com/foblex/flow/commit/fac0ff118f8f1143186f3d29174468af1fff45f1))
+- Added ConnectionMarkers example ([377b610](https://github.com/foblex/flow/commit/377b6109e6ca65f654f62976fe50b8277d7d542b))
+- Added ConnectionType and CustomConnectionType examples ([eb248c0](https://github.com/foblex/flow/commit/eb248c044bf854a208e4930e405b990a24840328))
+- Added Connector examples ([9b7d1ed](https://github.com/foblex/flow/commit/9b7d1edd5b537feeb132e2564e61538c2baa784b))
+- Added CustomConnections example ([fcfce91](https://github.com/foblex/flow/commit/fcfce91ea082d503d54f982fd624bded6838e3fc))
+- Added DragToGroup example ([d1d2ab9](https://github.com/foblex/flow/commit/d1d2ab999b4f57f17a30c18a9c7b4aa15d6015c2))
+- Added HelpInPositioning example ([ec4cef8](https://github.com/foblex/flow/commit/ec4cef837158f7301b76a56d855a242b63e3c663))
+- Added Minimap example ([82c57cd](https://github.com/foblex/flow/commit/82c57cdf8a018c0f37921756d1801c0b0dc3d980))
+- Added NodeSelection example ([87daaaa](https://github.com/foblex/flow/commit/87daaaa211360dd9d1b11e0c6a6ac27d93987d1f))
+- Added RemoveOnDrop and CreateOnDrop examples ([015865d](https://github.com/foblex/flow/commit/015865d2bf2ba75483fed2c28bacc827d646a116))
+- Added SelectionArea example ([71bf4fc](https://github.com/foblex/flow/commit/71bf4fcc6ec74189439b926fa3d544b4ca6da569))
+- Added TournamentBracket example ([a934e8c](https://github.com/foblex/flow/commit/a934e8c015d50541d3d19865251feb0c78281294))
+- Added UmlDiagram example ([1f48560](https://github.com/foblex/flow/commit/1f485605f38606952fa4e6e4c23aba32813428bd))
+- Added Zoom example ([044452f](https://github.com/foblex/flow/commit/044452f4f868e9772be3b14619ef4ebcdae46cbf))
+
+### Tests
+
+- Added E2E tests: DragHandle, DragToConnect, DragToReassign ([3513d63](https://github.com/foblex/flow/commit/3513d63d78c45e7d3f6a327f39aa7c58ecaacd51))
+- Fixed: RemoveOnDrop and DragToReassign tests ([a1a2a79](https://github.com/foblex/flow/commit/a1a2a798e0059d5cb1815289427c3bb1cc734c8d))
+
+## [16.0.0](https://github.com/foblex/flow/compare/v12.6.0...v16.0.0) (2024-09-24)
+
+### Features
+
+- Added centerNodeOrGroup functionality https://github.com/Foblex/f-flow/discussions/44 ([131ae19](https://github.com/foblex/flow/commit/131ae196ab84206c7ae7884b0b288a23b23f5edd))
+- Added getFlowState functionality https://github.com/Foblex/f-flow/issues/46 ([c5841fd](https://github.com/foblex/flow/commit/c5841fdd96683f195b09421870569cd3316aa7c3))
+- Added Server Side Rendering (SSR) support ([ba73083](https://github.com/foblex/flow/commit/ba7308383ec498f2ce79718d502ec75bd220a1b8))
+- Added snap connection to create functionality ([82b3872](https://github.com/foblex/flow/commit/82b38725db63093c2a126867345d2780049492c3))
+- Added snap connection to reassign functionality ([37972df](https://github.com/foblex/flow/commit/37972df1ccf933d0590d8efa8cc253b17f462464))
+- Added SSR support to m-render ([a3d6595](https://github.com/foblex/flow/commit/a3d6595fb28df1e8bfd61ccc8e989ec26e43f58d))
+- Changed imports from @foblex/core to @foblex/mediator, @foblex/platform, @foblex/2d ([30a60da](https://github.com/foblex/flow/commit/30a60da2e64aa87be52e6fb90f06f780b2dc0777))
+- Changed imports from @foblex/core to @foblex/utils, @foblex/drag-toolkit ([26d9631](https://github.com/foblex/flow/commit/26d96313b86d068d9912b3c6ff28ca0fa6c14039))
+- Cleanup after delete @foblex/core ([9aa5717](https://github.com/foblex/flow/commit/9aa5717434849c1a9b612e503d67c1a893b6b6e3))
+- Updated f-canvas user api ([978d764](https://github.com/foblex/flow/commit/978d76486d51c6d2cb75f617e15cc2b3dc75e43d))
+
+### Bug Fixes
+
+- Fixed After adding a Node, all the connections disappear https://github.com/Foblex/f-flow/issues/51 ([c47621d](https://github.com/foblex/flow/commit/c47621d336b69ddeedb38ee6bb5083b399962eee))
+- Fixed Cannot access 'AddPatternToBackgroundExecution' before initialization https://github.com/Foblex/f-flow/issues/53 ([ecfed74](https://github.com/foblex/flow/commit/ecfed74aa6fbf509324cea14cc648aeb14c4c043))
+- Fixed create connection target incorrect position with scale ([ec323c5](https://github.com/foblex/flow/commit/ec323c53a5d36ccbe30fe6d07fa229606ba73277))
+- Fixed doesn't work for angular 12 https://github.com/Foblex/f-flow/issues/48 ([70064b0](https://github.com/foblex/flow/commit/70064b059b65c4f7d64b269d6a2bc0f11e0ca3b0))
+- Fixed tests after removing @foblex/core ([60a4e92](https://github.com/foblex/flow/commit/60a4e92fccc4d1ef0dafcc9d72bf47d6ab64f1f4))
+- Fixed undefined snap connection ([739f414](https://github.com/foblex/flow/commit/739f4144e5c2df608410b87924be12fac5ae793e))
+
+### Tests
+
+- Added FindClosestInputUsingSnapThresholdExecution tests ([bcf1bda](https://github.com/foblex/flow/commit/bcf1bda003e67483b96b5de87c7cdf8bbe328a34))
+
+### Documentation
+
+- Added center node or group functionality ([01584c1](https://github.com/foblex/flow/commit/01584c1355217224541c4db9fc2c25c69197dd7f))
+- Added custom nodes example ([6f2bd7b](https://github.com/foblex/flow/commit/6f2bd7bde46f901bbe773a550c92de86160fb01f))
+- Added drag to connect and drag to reassign examples ([afdd469](https://github.com/foblex/flow/commit/afdd4693f0fdd545ef3015c01abbdcfb1c17b405))
+- Added drag-handle example ([8fb4399](https://github.com/foblex/flow/commit/8fb4399ac1fc6749efbf550af5beee81086cc27d))
+- Added grouping example ([766e456](https://github.com/foblex/flow/commit/766e45652a6962be3118b77f00d4a4f580c36ef3))
+- Added resize handle example ([4f23af5](https://github.com/foblex/flow/commit/4f23af534549fb0630d6db0e8e9a282cf734e617))
+- Added snap-connection documentation and example ([dd4895f](https://github.com/foblex/flow/commit/dd4895fb50d5385e506579c1ee03167259141f19))
+
+## [12.6.0](https://github.com/foblex/flow/compare/v12.5.0...v12.6.0) (2024-09-07)
+
+### Features
+
+- Added dagre layout example ([737dd1f](https://github.com/foblex/flow/commit/737dd1f1a13895f29e38656cfab238d5d2659eb7))
+- Added db management flow example ([4a605a3](https://github.com/foblex/flow/commit/4a605a32c4f20e00b533dafb7de7d3de28d3e358))
+- Added elkjs layout example ([9695e08](https://github.com/foblex/flow/commit/9695e0838d0572410d2514f2b1b17f2884e823a8))
+- Added examples common styles ([5e96e98](https://github.com/foblex/flow/commit/5e96e983f803ed5678802c08d6057cde75e087c6))
+- Added f-group functionality ([8a3c8ce](https://github.com/foblex/flow/commit/8a3c8cebe0ddb17252b6cada15f0080dfcd971c6))
+- Added fDragHandle documentation ([a655fdc](https://github.com/foblex/flow/commit/a655fdce6e5869379e80dc7da43d6bd35ea0e212))
+- Modified layers sorting functionality after adding f-group ([3c60249](https://github.com/foblex/flow/commit/3c602498df9dfdcd4a5a74bc174dd23000015eca))
+- Moved external item drag and drop functionality to component directory ([8b9dbb1](https://github.com/foblex/flow/commit/8b9dbb114eec8816a10e7de9494bcc6e82187911))
+- Moved selection area drag and drop functionality to component directory ([121a63e](https://github.com/foblex/flow/commit/121a63e1fdc8d5bdb7be9127c0008ba9f2de14e0))
+- Updated to m-render v1.2.2 ([bdaa267](https://github.com/foblex/flow/commit/bdaa267a705b701cbd5bb0886940f925412a79bd))
+
+### Bug Fixes
+
+- Fixed dagre layout trackby unique key ([102a771](https://github.com/foblex/flow/commit/102a771474654b07a3fe8f12c34ef07d900d2364))
+- Foblex Core is unable to slide the schema [#37](https://github.com/foblex/flow/issues/37) ([55a4070](https://github.com/foblex/flow/commit/55a407095c39d2428ce3b84d8cd448558dffb993))
+- Prevent selection when drag fExternalItem ([036e192](https://github.com/foblex/flow/commit/036e1921bd3f539dd93a03f724f0c5331f8a636d))
+
+### Documentation
+
+- Added custom connection type example ([b574306](https://github.com/foblex/flow/commit/b574306a7522c201d1b0274dd983f95a6a64b9fb))
+- Added db-management-flow dark theme ([1f8fe45](https://github.com/foblex/flow/commit/1f8fe45009ded71f6d825c6a6b49910ae1b0ec06))
+- Added f-group to db-management example ([65902f5](https://github.com/foblex/flow/commit/65902f59dcc07cc465beecc5b18046f763c6ca64))
+- Added group example ([dfd428b](https://github.com/foblex/flow/commit/dfd428b84808df863714920dd9dc60a525bdc0e7))
+- Added node with connectors example ([fb3bcb7](https://github.com/foblex/flow/commit/fb3bcb79ccf914b87c2e12888cdb25b993c42a83))
+- Updated Output and Input Documentation ([d942f88](https://github.com/foblex/flow/commit/d942f889a3906c287b1e7f783f40e5034c5fb716))
+
+### Tests
+
+- Added test to change items layers functionality ([01f27dd](https://github.com/foblex/flow/commit/01f27dd852c5d9c495b010e2144fa7241da31252))
+
+## [12.5.0](https://github.com/foblex/flow/compare/v12.3.9...v12.5.0) (2024-08-11)
+
+### Features
+
+- Add various site icons and upgrade library to Zoneless ([e561e69](https://github.com/foblex/flow/commit/e561e6972a723ea299005518057963ba260961af))
+- Added minimap functionality ([f5eece6](https://github.com/foblex/flow/commit/f5eece6df6e556a0ec0bbfa26ec623ce368f60ef))
+- Added Zoneless support ([a8c5812](https://github.com/foblex/flow/commit/a8c581285d8c9e6f246cbd2f2a07c346ce1ba131))
+- Update to m-render v1.2.1 ([8067764](https://github.com/foblex/flow/commit/80677640c5d917b564964987b575d9fb28e28ce5))
+
+### Documentation
+
+- Added minimap documentation ([ccbdb99](https://github.com/foblex/flow/commit/ccbdb990935d0d9ae04d92de47752b50a6b11190))
+- Added minimap examples ([5646066](https://github.com/foblex/flow/commit/56460662d015f4ba0e6269d8f6bbc0de6e7b058f))
+- Remove old changelogs and switch to standard-version ([ff5b9e5](https://github.com/foblex/flow/commit/ff5b9e53c342ee7403813ce807e38d55a350725b))
+
+## [12.4.0] - 2024-08-05
+
+### Bug Fixes
+
+- Incorrect canvas position when using canvas.fitToScreen ([#28](https://github.com/Foblex/f-flow/issues/28))
+- Items outside the flow are selected when dragging fExternalItem ([#27](https://github.com/Foblex/f-flow/issues/27))
+- Fixed incorrect rendering of connection lines in complex layouts.
+
+### Features
+
+- Describe documentation on how to add a custom background ([#9](https://github.com/Foblex/f-flow/issues/9))
+- Added support for multi-layered canvas backgrounds.
+
+## [12.3.0] - 2024-07-20
+
+### Bug Fixes
+
+- Resolved issues with node animations causing performance drops.
+- Fixed bug where context menu would not appear in certain conditions.
+
+## [12.2.2] - 2024-06-13
+
+### Bug Fixes
+
+- Move selected items without pressing ctrl ([#10](https://github.com/Foblex/f-flow/issues/10))
+- Fixed issue with node snapping to grid not working properly.
+- Resolved performance issues when handling large numbers of nodes.
+
+### Features
+
+- Create connection with undefined fInput when user drops connection on the canvas.
+- Added option to customize node colors dynamically.
+
+## [12.2.1] - 2024-05-30
+
+### Bug Fixes
+
+- Corrected display problems with mat-tooltips on smaller screens.
+
+### Features
+
+- Added new layout options for better node organization.
+
+## [12.2.0] - 2024-04-25
+
+### Features
+
+- Custom connection types ([#6](https://github.com/Foblex/f-flow/issues/6))
+- Introduced new node resizing handles for better UX.
+
+## [12.1.5] - 2024-04-10
+
+### Bug Fixes
+
+- Fixed issue with nodes overlapping when auto-arrange is used.
+- Improved stability of the canvas rendering engine.
+
+### Features
+
+- Added support for custom node shapes.
+
+## [12.1.0] - 2024-03-28
+
+### Bug Fixes
+
+- Resolved issues with drag-and-drop functionality in nested containers.
+- Fixed alignment issues with text labels on nodes.
+
+## [12.0.7] - 2024-03-26
+
+### Bug Fixes
+
+- fOutlet directive to allow multiple connections.
+- Corrected alignment issues with the connection labels.
+
+## [12.0.1] - 2024-03-20
+
+### Bug Fixes
+
+- fitToParent mixin toCenter parameter in scaled context.
+- Fixed bugs related to zooming and panning in the canvas.
+
+## [1.5.2] - 2024-03-14
+
+### Bug Fixes
+
+- Change id attributes for connectors to data attributes.
+- Improved error handling for connection failures.
+
+## [1.5.1] - 2024-03-12
+
+### Bug Fixes
+
+- Change id attributes to fId.
+- Resolved issues with duplicate node IDs causing conflicts.
+
+### Features
+
+- Segment connection type.
+- Bezier connection type.
+- FConnectionCenterComponent.
+- FConnectionCenterDirective.
+
+## [1.4.0] - 2024-02-28
+
+### Bug Fixes
+
+- Fixed issues with the selection area being inaccurate.
+- Corrected mat-tooltips not displaying for all node types.
+
+### Features
+
+- Added batch node editing capabilities.
+- Introduced dark mode for the entire interface.
+
+## [1.3.4] - 2024-02-23
+
+### Bug Fixes
+
+- Issue with the selection area not being removed after dragging.
+- FNodeDirective instead of FNodeComponent.
+- Fixed minor UI glitches in the node editor.
+
+## [1.3.0] - 2024-01-10
+
+### Features
+
+- Selection Area functionality.
+- Added keyboard shortcuts for faster node manipulation.
+
+### Bug Fixes
+
+- Single selection issue after dragging.
+- Fixed inconsistencies in node alignment after dragging.
+
+## [1.2.2] - 2023-10-12
+
+### Bug Fixes
+
+- fitToParent mixin in scaled context.
+- oneToOne mixin in scaled context.
+- Fixed issue with connection points not aligning correctly.
+
+### Features
+
+- Line Alignment component.
+- Added support for snapping nodes to guidelines.
+
+## [1.2.0] - 2023-08-30
+
+### Bug Fixes
+
+- Fixed rendering issues with high DPI screens.
+- Corrected problem with nodes not saving their state properly.
+
+### Features
+
+- Introduced node grouping functionality.
+- Added ability to lock nodes in place.
+
+## [1.1.0] - 2023-06-15
+
+### Bug Fixes
+
+- Resolved conflicts when merging nodes with similar attributes.
+
+### Features
+
+- New theme options for customizing the look and feel of the canvas.
+- Added real-time collaboration indicators.
+
+## [1.0.2] - 2023-02-02
+
+### Features
+
+- Reassign connection functionality.
+- Introduced basic node editing capabilities.

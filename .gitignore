@@ -1,0 +1,20 @@
+
+dist
+.angular
+.nx
+node_modules
+.idea
+tmp
+
+# Firebase
+.firebase
+*-debug.log
+.runtimeconfig.json
+
+.env
+*.env
+*.env.local
+
+cypress/videos
+cypress/screenshots
+/docs/design/

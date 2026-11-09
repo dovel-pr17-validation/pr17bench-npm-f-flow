@@ -1,0 +1,38 @@
+import {
+  InjectionToken,
+  InputSignal,
+  InputSignalWithTransform,
+  OutputEmitterRef,
+} from '@angular/core';
+import { IHasHostElement } from '../i-has-host-element';
+import type { IFFlowState, IFFlowStateOptions } from '../domain';
+
+export const F_FLOW = new InjectionToken<FFlowBase>('F_FLOW');
+
+export abstract class FFlowBase implements IHasHostElement {
+  public abstract fId: InputSignal<string>;
+  public abstract fCache: InputSignalWithTransform<boolean, unknown>;
+
+  public abstract hostElement: HTMLElement;
+
+  public abstract fNodesRendered: OutputEmitterRef<string>;
+
+  public abstract fFullRendered: OutputEmitterRef<string>;
+
+  /**
+   * @deprecated Use `fFullRendered` instead.
+   */
+  public abstract fLoaded: OutputEmitterRef<string>;
+
+  public abstract redraw(): void;
+
+  /**
+   * Re-runs the full-render lifecycle so `fFullRendered` fires again — e.g. to
+   * re-trigger a `resetScaleAndCenter` the app runs from that output.
+   */
+  public abstract reset(): void;
+
+  public abstract getState(options?: IFFlowStateOptions): IFFlowState;
+
+  public abstract select(nodes: string[], connections: string[], isSelectedChanged?: boolean): void;
+}

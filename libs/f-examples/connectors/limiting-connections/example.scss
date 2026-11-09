@@ -1,0 +1,16 @@
+@use '@foblex/flow/styles' as flow-theme;
+
+::ng-deep {
+  @include flow-theme.theme-tokens();
+}
+
+::ng-deep f-flow {
+  @include flow-theme.connection($scoped: false);
+}
+
+.f-node {
+  @include flow-theme.node($selectorless: true);
+  width: 160px;
+}
+
+@include flow-theme.connector($scoped: false);

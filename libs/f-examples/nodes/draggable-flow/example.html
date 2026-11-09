@@ -1,0 +1,25 @@
+<f-flow fInitialView fDraggable (fLoaded)="loaded()">
+  <f-canvas>
+    <f-connection fOutputId="output1" fInputId="input1" />
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 0, y: 0 }"
+      fNodeOutput
+      fOutputId="output1"
+      fOutputConnectableSide="right"
+    >
+      Node 1
+    </div>
+    <div
+      fNode
+      fDragHandle
+      [fNodePosition]="{ x: 250, y: 0 }"
+      fNodeInput
+      fInputId="input1"
+      fInputConnectableSide="left"
+    >
+      Node 2
+    </div>
+  </f-canvas>
+</f-flow>

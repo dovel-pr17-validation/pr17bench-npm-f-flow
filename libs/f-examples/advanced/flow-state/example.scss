@@ -1,0 +1,19 @@
+@use '@foblex/flow/styles' as flow-theme;
+
+::ng-deep {
+  @include flow-theme.theme-tokens();
+}
+
+::ng-deep f-flow {
+  @include flow-theme.connection($scoped: false);
+  @include flow-theme.connection-markers($scoped: false);
+  @include flow-theme.plugins($scoped: false);
+}
+
+@include flow-theme.node($selectorless: false);
+@include flow-theme.connector($scoped: false);
+@include flow-theme.node-group($scoped: false);
+@include flow-theme.grouping($scoped: false);
+@include flow-theme.external-item-all($scoped: false);
+
+@include flow-theme.selection-area();

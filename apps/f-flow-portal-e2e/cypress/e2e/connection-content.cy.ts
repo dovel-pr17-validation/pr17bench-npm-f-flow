@@ -1,0 +1,26 @@
+describe('ConnectionContent', () => {
+  beforeEach(() => {
+    cy.visit('http://localhost:4200/examples/connection-content');
+    cy.get('f-flow').scrollIntoView();
+    cy.wait(200);
+  });
+
+  it('should render content on each connection and keep it after controls change', () => {
+    cy.get('.f-connection-content').should('have.length', 4).and('contain.text', 'Any Content');
+    cy.get('f-select select').should('have.length', 3);
+
+    cy.get('.f-connection-content')
+      .first()
+      .invoke('attr', 'style')
+      .then((beforeStyle) => {
+        cy.contains('f-select', 'Position').find('select').select('75%', { force: true });
+
+        cy.get('.f-connection-content')
+          .should('have.length', 4)
+          .and('contain.text', 'Any Content')
+          .first()
+          .invoke('attr', 'style')
+          .should('not.equal', beforeStyle);
+      });
+  });
+});

@@ -1,0 +1,111 @@
+import { ILine, IPoint, PointExtensions, RoundedRect } from '../../../_libs/f-2d';
+import { FMediator } from '../../../_libs/f-mediator';
+import {
+  GetConnectorRectReferenceRequest,
+  IConnectorRectRef,
+  ResolveConnectionEndpointRotationContextRequest,
+} from '../../../domain';
+import {
+  FConnectorBase,
+  requireSourceConnector,
+  requireTargetConnector,
+} from '../../../f-connectors';
+import { FComponentsStore } from '../../../f-storage';
+import { inject } from '@angular/core';
+import {
+  ConnectionBehaviourBuilder,
+  ConnectionBehaviourBuilderRequest,
+  FConnectionBase,
+  IConnectionEndpointRotationContext,
+} from '../../../f-connection-v2';
+import { SetFCacheConnectorRectRequest } from '../../../f-cache';
+
+export class DragNodeConnectionHandlerBase {
+  private readonly _mediator = inject(FMediator);
+  private readonly _store = inject(FComponentsStore);
+  private readonly _behaviour = inject(ConnectionBehaviourBuilder);
+
+  private _source!: FConnectorBase;
+  private _target!: FConnectorBase;
+
+  private _sourceRef!: IConnectorRectRef;
+  private _targetRef!: IConnectorRectRef;
+
+  private _sourceDelta: IPoint = PointExtensions.initialize();
+  private _targetDelta: IPoint = PointExtensions.initialize();
+
+  public connection!: FConnectionBase;
+
+  public initialize(connection: FConnectionBase): void {
+    this.connection = connection;
+
+    this._source = requireSourceConnector(this._store, this.connection.sourceId());
+    this._target = requireTargetConnector(this._store, this.connection.targetId());
+
+    this._sourceRef = this._readRectRef(this._source);
+    this._targetRef = this._readRectRef(this._target);
+  }
+
+  public setSourceDelta(delta: IPoint): void {
+    this._sourceDelta = delta;
+    this._mediator.execute(
+      new SetFCacheConnectorRectRequest(
+        this._source.fId(),
+        this._source.kind,
+        this._withDelta(this._sourceRef.rect, delta),
+      ),
+    );
+  }
+
+  public setTargetDelta(delta: IPoint): void {
+    this._targetDelta = delta;
+    this._mediator.execute(
+      new SetFCacheConnectorRectRequest(
+        this._target.fId(),
+        this._target.kind,
+        this._withDelta(this._targetRef.rect, delta),
+      ),
+    );
+  }
+
+  protected redraw(): void {
+    const line = this._buildLine();
+    this.connection.setLine(line);
+    this.connection.redraw();
+  }
+
+  private _buildLine(): ILine {
+    const sourceRect = RoundedRect.fromRoundedRect(this._sourceRef.rect).addPoint(
+      this._sourceDelta,
+    );
+    const targetRect = RoundedRect.fromRoundedRect(this._targetRef.rect).addPoint(
+      this._targetDelta,
+    );
+
+    return this._behaviour.handle(
+      new ConnectionBehaviourBuilderRequest(
+        sourceRect,
+        targetRect,
+        this.connection,
+        this._sourceRef.connector.fConnectableSide,
+        this._targetRef.connector.fConnectableSide,
+        this._resolveRotationContext(this._sourceRef.connector),
+        this._resolveRotationContext(this._targetRef.connector),
+      ),
+    );
+  }
+
+  private _readRectRef(connector: FConnectorBase): IConnectorRectRef {
+    return this._mediator.execute(new GetConnectorRectReferenceRequest(connector));
+  }
+
+  private _withDelta(rect: IConnectorRectRef['rect'], delta: IPoint): IConnectorRectRef['rect'] {
+    return RoundedRect.fromRoundedRect(rect).addPoint(delta);
+  }
+
+  private _resolveRotationContext(
+    connector?: FConnectorBase,
+  ): IConnectionEndpointRotationContext | undefined {
+    return this._mediator.execute(new ResolveConnectionEndpointRotationContextRequest(connector));
+  }
+}

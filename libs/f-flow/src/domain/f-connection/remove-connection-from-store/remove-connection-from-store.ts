@@ -1,0 +1,17 @@
+import { inject, Injectable } from '@angular/core';
+import { IExecution } from '../../../_libs/f-mediator';
+import { RemoveConnectionFromStoreRequest } from './remove-connection-from-store-request';
+import { FComponentsStore } from '../../../f-storage';
+
+@Injectable()
+export class RemoveConnectionFromStore implements IExecution<
+  RemoveConnectionFromStoreRequest,
+  void
+> {
+  private readonly _store = inject(FComponentsStore);
+
+  public handle({ connection }: RemoveConnectionFromStoreRequest): void {
+    this._store.connections.remove(connection);
+    this._store.emitConnectionChanges();
+  }
+}

@@ -1,0 +1,173 @@
+# Canvas
+
+**Selector:** `f-canvas`  
+**Class:** `FCanvasComponent`
+
+`f-canvas` is the **viewport layer** inside `f-flow`. It is responsible for the **transform of the whole diagram** - pan (position) and zoom (scale).  
+Everything that should move/scale together (nodes, groups, connections) must be placed inside `f-canvas`.
+
+## Role in the flow structure
+
+A typical diagram structure is always:
+
+```html
+<f-flow>
+  <f-canvas>
+    <!-- nodes / groups / connections -->
+  </f-canvas>
+</f-flow>
+```
+
+- `f-flow` is the root container and the integration point for plugins (drag, selection, zoom, helpers, minimap).
+- `f-canvas` is the viewport that applies **position + scale** to its content.
+- Nodes / groups / connections outside of `f-canvas` **won’t participate** in transforms and interaction logic.
+
+**What you get**
+
+- Pan/zoom transform state for the whole diagram.
+- Imperative viewport methods (`fitToScreen`, `centerGroupOrNode`, scale control).
+- Debounced `fCanvasChange` notifications for sync with external UI.
+
+## API
+
+### Inputs
+
+- `position: InputSignal<IPoint>;` Canvas position (pan). When it changes, the canvas is redrawn.
+
+- `scale: InputSignal<number>;` Canvas scale (zoom). When it changes, the canvas is redrawn.
+
+- `debounceTime: InputSignal<number>;` Debounce time (ms) for `fCanvasChange`. Values below `0` are normalized to `0`.
+
+- `fLayers: InputSignal<EFCanvasLayer[] | undefined>;` Sets the built-in layer order from bottom to top. A non-empty direct input overrides `withFCanvas({ layers })`; an empty or unset input falls back to the provider value. Omitted layers are appended afterward in their default relative order. Default order: groups, connections, nodes.
+
+### Outputs
+
+- `fCanvasChange: OutputEmitterRef<FCanvasChangeEvent>;` Emits when the canvas transform changes (position/scale). Useful for syncing external UI (toolbar, status).
+
+### Methods
+
+- `redraw(): void;` Triggers an immediate redraw.
+
+- `getPosition(): IPoint;` Returns current canvas position.
+
+- `getScale(): number;` Returns current scale.
+
+- `setScale(scale: number, toPosition: IPoint = { x: 0, y: 0 }): void;` Sets scale. Optionally zooms around a point (useful for “zoom to cursor” UX).
+
+- `resetScale(): void;` Resets scale to `1`.
+
+- `resetScaleAndCenter(animated: boolean = true, emitCanvasChange: boolean = true): void;` Resets scale to `1` and centers the viewport. Pass `false` as the second argument for a programmatic move that must not emit `fCanvasChange`.
+
+- `resetScaleAndCenterGroupOrNode(groupOrNodeId: string, animated: boolean = true, emitCanvasChange: boolean = true): void;` Resets scale to `1` and centers a specific group or node. Use it when focusing an item must also normalize zoom.
+
+- `fitToScreen(padding: IPoint = { x: 0, y: 0 }, animated: boolean = true, emitCanvasChange: boolean = true, maxScale?: number): void;` Fits all nodes/groups into the viewport. Padding adds extra space around content; the third argument controls `fCanvasChange` emission; `maxScale` caps the resulting zoom so a small graph is not magnified to fill the screen.
+
+- `centerGroupOrNode(groupOrNodeId: string, animated: boolean = true, emitCanvasChange: boolean = true): void;` Centers the viewport on a group or node by id while preserving the current scale. The third argument controls `fCanvasChange` emission.
+
+### Types
+
+#### IPoint
+
+```typescript
+interface IPoint {
+  x: number;
+  y: number;
+}
+```
+
+#### FCanvasChangeEvent
+
+```typescript
+class FCanvasChangeEvent {
+  readonly position: IPoint;
+  readonly scale: number;
+}
+```
+
+#### EFCanvasLayer
+
+```typescript
+enum EFCanvasLayer {
+  GROUPS = 'groups',
+  CONNECTIONS = 'connections',
+  NODES = 'nodes',
+}
+```
+
+Provide a shared default with `provideFFlow(withFCanvas({ layers }))`, or bind `[fLayers]` on one canvas when that instance needs a different stacking order.
+
+## Styling
+
+- `.f-component` Base class for flow primitives.
+- `.f-canvas` Host class for the canvas layer.
+- `.f-connections-container` Connection layer container.
+- `.f-canvas-dragging` Temporary host class used during drag transitions.
+- `.canvas-dragging` Deprecated compatibility alias for `.f-canvas-dragging`.
+
+## Notes / Pitfalls
+
+- `f-canvas` depends on a parent `f-flow`; using it alone is not supported.
+- High-frequency transform updates can flood consumers if `debounceTime` is `0`; use debouncing when syncing external UI.
+- Prefer `fitToScreen` or `resetScaleAndCenter` after `fFullRendered` so nodes and connection geometry are already stable.
+
+## Programmatic viewport changes
+
+`resetScaleAndCenter`, `resetScaleAndCenterGroupOrNode`, `fitToScreen`, and `centerGroupOrNode` redraw the viewport and emit `fCanvasChange` by default. Keep that default for commands that should behave like a visible editor action and be observed by external state.
+
+For initialization or another application-driven view adjustment that must not enter managed history, pass `false` as `emitCanvasChange`:
+
+```ts
+// animated = false, emitCanvasChange = false
+this.canvas().resetScaleAndCenter(false, false);
+
+// padding, animated, emitCanvasChange
+this.canvas().fitToScreen({ x: 40, y: 40 }, true, false);
+
+// id, animated, emitCanvasChange
+this.canvas().centerGroupOrNode(nodeId, true, false);
+
+// id, animated, emitCanvasChange; also resets scale to 1
+this.canvas().resetScaleAndCenterGroupOrNode(nodeId, true, false);
+```
+
+Suppressing `fCanvasChange` does not skip rendering: the canvas transform, background, minimap and viewport still update. It only prevents the public change event, so listeners such as `FFlowState` do not record that programmatic move.
+
+## Common tasks
+
+### Fit content after the first render
+
+Call viewport helpers after `fFullRendered`, when nodes and connections are already fully rendered.
+
+```html
+<f-flow (fFullRendered)="onLoaded()" fDraggable>
+  <f-canvas></f-canvas>
+</f-flow>
+```
+
+```ts
+protected onLoaded(): void {
+  this.canvas().fitToScreen({ x: 40, y: 40 }, true, false);
+  // or:
+  // this.canvas().resetScaleAndCenter(true, false);
+}
+```
+
+### Center a node from a side panel
+
+When a user clicks an item in a list, center the canvas:
+
+```ts
+protected focusNode(id: string): void {
+  this.canvas().centerGroupOrNode(id, true);
+}
+```
+
+Use `resetScaleAndCenterGroupOrNode(id, true)` instead when focusing an item should also return the viewport to zoom `1`.
+
+### Sync external UI
+
+Listen to `fCanvasChange` to reflect current pan/zoom outside the canvas.
+
+```html
+<f-canvas (fCanvasChange)="canvasChanged($event)"></f-canvas>
+```

@@ -1,0 +1,22 @@
+@use '@foblex/flow/styles' as flow-theme;
+
+::ng-deep {
+  @include flow-theme.theme-tokens();
+}
+
+@include flow-theme.node($selectorless: false);
+
+@include flow-theme.external-item-all();
+
+.external-panel {
+  background-color: var(--ff-node-background-color);
+  width: 170px;
+  border-radius: 4px;
+  padding: 4px;
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

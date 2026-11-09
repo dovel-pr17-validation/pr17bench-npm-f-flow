@@ -1,0 +1,131 @@
+import {
+  booleanAttribute,
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  input,
+  Input,
+  numberAttribute,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  ViewEncapsulation,
+} from '@angular/core';
+import { EmitConnectionsChangesRequest } from '../../f-storage';
+import { castToEnum } from '../../_libs/f-utils';
+import { FMediator } from '../../_libs/f-mediator';
+import { AddConnectionToStoreRequest, RemoveConnectionFromStoreRequest } from '../../domain';
+import { stringAttribute } from '../../utils';
+import {
+  EFConnectionBehavior,
+  EFConnectionConnectableSide,
+  EFConnectionType,
+  F_CONNECTION_COMPONENTS_PARENT,
+  FConnectionBase,
+} from '../../f-connection-v2';
+
+let uniqueId = 0;
+
+@Component({
+  standalone: false,
+  selector: 'f-connection',
+  exportAs: 'fComponent',
+  templateUrl: './f-connection.component.html',
+  styleUrls: ['./f-connection.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.id]': 'fId()',
+    '[attr.data-f-connection-type]': 'fType',
+    class: 'f-component f-connection',
+    '[class.f-connection-selection-disabled]': 'fSelectionDisabled()',
+    '[class.f-connection-reassign-disabled]': 'fDraggingDisabled()',
+  },
+  providers: [{ provide: F_CONNECTION_COMPONENTS_PARENT, useExisting: FConnectionComponent }],
+  encapsulation: ViewEncapsulation.None,
+})
+export class FConnectionComponent extends FConnectionBase implements OnInit, OnChanges, OnDestroy {
+  public override fId = input<string>(`f-connection-${uniqueId++}`, { alias: 'fConnectionId' });
+
+  public override fSourceId = input<string, unknown>('', {
+    transform: (value) => stringAttribute(value) || '',
+  });
+
+  public override fTargetId = input<string, unknown>('', {
+    transform: (value) => stringAttribute(value) || '',
+  });
+
+  /** @deprecated Use `fSourceId`. */
+  public override fOutputId = input<string, unknown>('', {
+    transform: (value) => stringAttribute(value) || '',
+  });
+
+  /** @deprecated Use `fTargetId`. */
+  public override fInputId = input<string, unknown>('', {
+    transform: (value) => stringAttribute(value) || '',
+  });
+
+  @Input({ transform: numberAttribute })
+  public override fRadius: number = 8;
+
+  @Input({ transform: numberAttribute })
+  public override fOffset: number = 12;
+
+  @Input({ transform: (value: unknown) => castToEnum(value, 'fBehavior', EFConnectionBehavior) })
+  public override fBehavior: EFConnectionBehavior = EFConnectionBehavior.FIXED;
+
+  @Input()
+  public override fType: EFConnectionType | string = EFConnectionType.STRAIGHT;
+
+  public override fSelectionDisabled = input(false, { transform: booleanAttribute });
+
+  public override fReassignableStart = input(false, { transform: booleanAttribute });
+
+  public override fDraggingDisabled = input(false, {
+    alias: 'fReassignDisabled',
+    transform: booleanAttribute,
+  });
+
+  public override fSourceSide = input(EFConnectionConnectableSide.DEFAULT, {
+    transform: (x) => {
+      return castToEnum(x, 'fSourceSide', EFConnectionConnectableSide);
+    },
+  });
+
+  public override fTargetSide = input(EFConnectionConnectableSide.DEFAULT, {
+    transform: (x) => {
+      return castToEnum(x, 'fTargetSide', EFConnectionConnectableSide);
+    },
+  });
+
+  /** @deprecated Use `fTargetSide`. */
+  public override fInputSide = input(EFConnectionConnectableSide.DEFAULT, {
+    transform: (x) => {
+      return castToEnum(x, 'fInputSide', EFConnectionConnectableSide);
+    },
+  });
+
+  /** @deprecated Use `fSourceSide`. */
+  public override fOutputSide = input(EFConnectionConnectableSide.DEFAULT, {
+    transform: (x) => {
+      return castToEnum(x, 'fOutputSide', EFConnectionConnectableSide);
+    },
+  });
+
+  public override get boundingElement(): HTMLElement | SVGElement {
+    return this.fPath().hostElement;
+  }
+
+  private readonly _mediator = inject(FMediator);
+
+  public ngOnInit(): void {
+    this._mediator.execute(new AddConnectionToStoreRequest(this));
+  }
+
+  public ngOnChanges(): void {
+    this._mediator.execute(new EmitConnectionsChangesRequest());
+  }
+
+  public ngOnDestroy(): void {
+    this._mediator.execute(new RemoveConnectionFromStoreRequest(this));
+  }
+}

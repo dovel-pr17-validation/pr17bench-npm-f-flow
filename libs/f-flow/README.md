@@ -1,0 +1,217 @@
+<p align="center">
+  <a href="https://flow.foblex.com/">
+    <img style="margin: auto" src="https://github.com/user-attachments/assets/ee1d39f6-0a89-4cb9-8dee-1652aba82e69" alt="Foblex Flow Logo"/>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@foblex/flow">
+    <img src="https://img.shields.io/npm/v/@foblex/flow.svg?logo=npm&logoColor=fff&label=Release&color=limegreen" alt="NPM Release"/>
+  </a>
+  <a href="https://github.com/Foblex/f-flow/actions/workflows/tests-ci.yml">
+    <img src="https://github.com/Foblex/f-flow/actions/workflows/tests-ci.yml/badge.svg" alt="Build Status"/>
+  </a>
+  <a href="https://www.npmjs.com/package/@foblex/flow">
+    <img src="https://img.shields.io/npm/dw/@foblex/flow.svg?label=Downloads&color=blue" alt="NPM Weekly Downloads"/>
+  </a>
+  <a href="https://github.com/Foblex/f-flow/stargazers">
+    <img src="https://img.shields.io/github/stars/Foblex/f-flow.svg?label=Stars&color=gold" alt="GitHub Stars"/>
+  </a>
+  <a href="https://github.com/Foblex/f-flow/blob/main/LICENSE">
+    <img src="https://img.shields.io/npm/l/@foblex/flow.svg?label=License&color=green" alt="MIT License"/>
+  </a>
+</p>
+
+<h1 align="center">Foblex Flow</h1>
+
+<p align="center">
+  <strong>The most adopted node editor library for Angular — for production workflow builders, AI pipelines, and interactive diagram editors.</strong>
+</p>
+
+Foblex Flow ships the hard parts of a production node editor — drag logic, hit-testing, SVG connection paths, reassign, selection, zoom, and undo/redo — as Angular-native building blocks. Begin with `f-flow`, `f-canvas`, nodes, and connections, then add richer editor features only when your product needs them. It powers production products such as [Luware Nimbus](https://luware.com/products/nimbus), [ProcessMIX](https://processmix.com/), [XpertAI](https://xpertai.cn/en/), and [EpicStaff](https://www.epicstaff.ai/).
+
+Use it to create workflow builders, AI low-code tools, call-flow editors, UML diagrams, internal back-office tools, and other node-based interfaces. Start with app-owned graph records, or opt into managed records and undo/redo with `withFlowState()`; validation, persistence, permissions, and domain logic remain application concerns in both modes.
+
+<p align="center">
+  <a href="https://flow.foblex.com/examples/overview">
+    <img src="https://flow.foblex.com/previews/examples/reflow-on-resize.light.png" alt="Foblex Flow — Angular node editor with draggable nodes and connections" width="720"/>
+  </a>
+</p>
+
+Current `19.x` releases target Angular `17.3+`. If your app is on Angular 12-17.2, check the [Angular Version Compatibility](https://flow.foblex.com/docs/angular-version-compatibility) guide first and pin the matching Foblex Flow line before installing.
+
+## Built for AI Coding Agents
+
+Foblex Flow treats AI coding agents as first-class users: the package ships a version-matched guide at `node_modules/@foblex/flow/AI.md`, `ng add` writes workspace agent rules, and stable `FFxxxx` diagnostics give agents a concrete pass/fail signal. Before generating code, verify Foblex-specific selectors and APIs against that guide or the linked official reference; do not infer APIs from other node editor libraries.
+
+Choose the integration deliberately: classic mode keeps graph records in the application, while optional `provideFFlow(withFlowState())` provides typed managed records and undo/redo for supported operations. Verify generated flows using the APIs and `FFxxxx` diagnostics described in the shipped guide.
+
+[AI setup guide](https://flow.foblex.com/docs/ai) · [Full curated LLM-readable reference](https://flow.foblex.com/llms-full.txt)
+
+## Why Foblex Flow
+
+- The most adopted node editor library built for Angular, by npm weekly downloads — maintained full-time since 2022 and used in production commercial products.
+- Easy starting path: most editors begin with `f-flow`, `f-canvas`, nodes, connectors, and connections.
+- Angular-first API that fits Angular apps instead of wrapping a React-style state model.
+- Built for real editor interactions: drag to connect, drag to reassign, selection, zoom, minimap, snapping, alignment helpers, and waypoints.
+- Advanced modules are optional: caching and virtualization are scaling tools, not day-one requirements.
+- Custom nodes, connectors, and connections for domain-specific graph UIs.
+- Choose the state boundary that fits your editor: app-owned records by default, or optional typed `FFlowState` records with snapshots and undo/redo.
+- Your app stays in control of validation rules, permissions, persistence, and business meaning in either state mode.
+- Suitable for both lightweight diagrams and full workflow-builder products.
+
+## Feature Overview
+
+| Area          | What ships out of the box                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editing       | Drag & drop nodes and groups, drag/click/keyboard connection creation, reassign, waypoints, resize, rotate, snap & alignment guides, magnetic lines                       |
+| Navigation    | Pan, wheel/pinch/double-click zoom, minimap, auto-pan at edges, fit-to-screen, configurable control schemes (Miro-like, draw.io-like presets)                             |
+| Selection     | Click, marquee, multi-select, select-all, selection events — your app decides what selection means                                                                        |
+| Accessibility | ARIA semantics by default; opt-in keyboard layer: spatial navigation, move, delete, and connection creation without a mouse, screen-reader announcements, remappable keys |
+| Layout        | Dagre and ELK auto-layout packages, reflow-on-resize, layer ordering                                                                                                      |
+| Scale         | Node virtualization, render caching, background workers — optional, for large scenes                                                                                      |
+| Customization | Fully templated nodes/connections/connectors, themable via CSS tokens/SCSS mixins, custom markers, connection gradients and labels                                        |
+| Integration   | Classic event-driven API with app-owned records, or optional `withFlowState()` managed records, snapshots, and undo/redo; SSR-safe, zoneless-ready                        |
+| AI tooling    | `llms.txt`, bundled `AI.md`, `ng add` writes agent rules, dev diagnostics with stable `FFxxxx` error codes                                                                |
+
+Comparing options? Read the honest comparisons: [React Flow vs Foblex Flow for Angular teams](https://flow.foblex.com/docs/react-flow-vs-foblex-flow-for-angular-teams) and [ngx-vflow vs Foblex Flow](https://flow.foblex.com/docs/ngx-vflow-vs-foblex-flow).
+
+## Choose Your State Integration
+
+The default **classic mode** renders arrays or signals owned by your application. Foblex Flow emits final interaction events such as `fCreateConnection` and `fMoveNodes`; your handlers validate them and update application state.
+
+The optional **managed mode** installs `provideFFlow(withFlowState())`. Its typed `FFlowState` records apply supported gestures automatically and provide batching, snapshots, undo, and redo. Your application still defines domain fields and decides how records are validated and persisted.
+
+[Managed Flow State guide](https://flow.foblex.com/docs/managed-flow-state) · [Live state example](https://flow.foblex.com/examples/state)
+
+## What You Can Build
+
+- Angular node editors
+- Angular workflow builders
+- AI low-code and internal tools
+- Call flows, automation editors, and pipeline UIs
+- UML, architecture, and other interactive diagram interfaces
+
+## Examples
+
+- [AI Low-Code Platform](https://flow.foblex.com/examples/ai-low-code-platform) - A flagship front-end-only AI low-code IDE demo with custom nodes, JSON import/export, multiple themes, config panels with validation, validation feedback on nodes, undo/redo, persistence, multi-select, and animated connections.
+- [Call Center Flow](https://flow.foblex.com/examples/call-center) - A workflow-builder reference app for IVR routing, queueing, operator handoff, transfer, voicemail, and embedded node forms.
+- [Schema Designer](https://flow.foblex.com/examples/schema-designer) - A richer schema editor demo with nodes, relations, and CRUD-style interactions.
+- [UML Diagram](https://flow.foblex.com/examples/uml-diagram-example) - An Angular example for architecture and UML-style graph interfaces.
+- [Tournament Bracket](https://flow.foblex.com/examples/tournament-bracket) - A specialized bracket UI built on the same node-based primitives.
+- [All Examples](https://flow.foblex.com/examples/overview) - Focused examples for connections, selection, minimap, layout, alignment, and other editor features.
+
+## Try It Online
+
+No local setup needed — the minimal starter runs in the browser:
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Foblex/f-flow/tree/main/starters/minimal-flow)
+
+## Install
+
+These install commands are for the current `19.x` line. For Angular 12-17.2 apps, use the [Angular Version Compatibility](https://flow.foblex.com/docs/angular-version-compatibility) guide first so you do not accidentally install a newer incompatible line.
+
+```bash
+ng add @foblex/flow
+```
+
+For Nx workspaces:
+
+```bash
+nx g @foblex/flow:add
+```
+
+`ng add` installs the required companion packages automatically. If you prefer manual installation, install them explicitly:
+
+```bash
+npm install @foblex/flow @foblex/platform@^1.0.4 @foblex/mediator@^1.1.3 @foblex/2d@^1.2.2 @foblex/utils@^1.1.1
+```
+
+`ng add` also wires the shipped default theme into application styles by adding `node_modules/@foblex/flow/styles/default.scss` when the entry is missing.
+
+## Default Theme
+
+Use the default theme when you want styled nodes, connectors, connections, minimap, selection area, and helper plugins immediately.
+
+```json
+"styles": [
+  "src/styles.scss",
+  "node_modules/@foblex/flow/styles/default.scss"
+]
+```
+
+If you prefer selective SCSS mixins instead of one full entrypoint:
+
+```scss
+@use '@foblex/flow/styles' as flow-theme;
+
+@include flow-theme.theme-tokens();
+@include flow-theme.flow-canvas();
+@include flow-theme.node-group();
+@include flow-theme.connector();
+@include flow-theme.connection-all();
+@include flow-theme.plugins();
+```
+
+Full guide: [Default Theme and Styling](https://flow.foblex.com/docs/default-theme-and-styling)
+
+## Minimal Example
+
+```html
+<f-flow fDraggable>
+  <f-canvas>
+    <f-connection fSourceId="a-out" fTargetId="b-in"></f-connection>
+
+    <div fNode fDragHandle [fNodePosition]="{ x: 24, y: 24 }">
+      Drag me
+      <div fConnector fConnectorType="source" fConnectorId="a-out"></div>
+    </div>
+
+    <div fNode fDragHandle [fNodePosition]="{ x: 244, y: 24 }">
+      Drag me too
+      <div fConnector fConnectorType="target" fConnectorId="b-in"></div>
+    </div>
+  </f-canvas>
+</f-flow>
+```
+
+That is the rendering mental model: `f-flow` hosts the editor, `f-canvas` pans and zooms, any element becomes a node with `fNode`, and `fConnector` endpoints attach connections. State management and every advanced feature remain explicit choices.
+
+## Quick FAQ
+
+- **Is Foblex Flow hard to use?** No. The core setup is small and Angular-native.
+- **Do I need caching or virtualization?** No. Most editors do not need them on day one. They are optional scaling tools for larger scenes.
+- **Who is it for?** Angular teams building node editors, workflow builders, interactive diagrams, and other graph-based product UIs.
+
+## Resources
+
+- [Get Started](https://flow.foblex.com/docs/get-started)
+- [Angular Version Compatibility](https://flow.foblex.com/docs/angular-version-compatibility)
+- [Managed Flow State](https://flow.foblex.com/docs/managed-flow-state)
+- [Large Flow Performance](https://flow.foblex.com/docs/large-flow-performance)
+- [Shadow DOM and Angular Elements](https://flow.foblex.com/docs/shadow-dom-and-angular-elements)
+- [Migrating to Unified Connectors](https://flow.foblex.com/docs/migrating-to-unified-connectors)
+- [Documentation](https://flow.foblex.com/docs/intro)
+- [Examples](https://flow.foblex.com/examples/overview)
+- [Articles](https://flow.foblex.com/blog/overview)
+- [Showcase](https://flow.foblex.com/showcase/overview)
+- [Roadmap](https://github.com/Foblex/f-flow/blob/main/ROADMAP.md)
+- [Changelog](https://github.com/Foblex/f-flow/blob/main/CHANGELOG.md)
+
+### For AI Agents and LLMs
+
+- [llms.txt](https://flow.foblex.com/llms.txt) — docs index for agents; [llms-full.txt](https://flow.foblex.com/llms-full.txt) — full curated LLM-readable reference
+- [AI usage guide](https://github.com/Foblex/f-flow/blob/main/libs/f-flow/AI.md) — strict code-generation rules, also shipped inside this package at `node_modules/@foblex/flow/AI.md`
+
+## Community and Support
+
+- [GitHub Repository](https://github.com/Foblex/f-flow)
+- [GitHub Discussions](https://github.com/Foblex/f-flow/discussions)
+- [Issue Tracker](https://github.com/Foblex/f-flow/issues)
+- [Documentation Portal](https://flow.foblex.com)
+
+For questions or partnership inquiries: support@foblex.com
+
+## License
+
+Foblex Flow is available under the [MIT License](https://github.com/Foblex/f-flow/blob/main/LICENSE).

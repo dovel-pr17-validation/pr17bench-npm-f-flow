@@ -1,0 +1,233 @@
+# AI Guide for `@foblex/flow`
+
+Use this file as a strict control layer for code generation. Prefer verified package API and examples over assumptions.
+
+## What This Library Is
+
+`@foblex/flow` is the most widely adopted node editor library for Angular (by npm weekly downloads) — Angular-native, for production workflow builders, AI pipelines, and interactive diagram editors.
+It provides rendering, connectors, interactions, selection, zoom, and connection drawing. By default your app owns graph records; the optional `withFlowState()` feature maintains typed records and undo/redo that your app explicitly loads and renders.
+
+## Core Mental Model
+
+- **Classic mode (default):** your app owns nodes, groups, and connections. User actions emit events; your handlers validate them, update app state, and Angular rerenders.
+- **Managed mode (opt-in):** `provideFFlow(withFlowState())` provides `FFlowState`; supported completed gestures update its typed records and history automatically.
+- **Application responsibility in both modes:** your app defines domain fields and owns validation policy, permissions, persistence, backend integration, and business meaning.
+- Both modes render records through normal Angular templates. `withFlowState()` is optional and does not change classic event behavior when absent.
+
+## Minimal Working Setup
+
+Three files must be correct at the same time. Missing any one produces a blank or inert canvas, usually without errors.
+
+```typescript
+// component — FFlowModule is required: fNode, fConnector, f-connection are not standalone
+import { FFlowModule } from '@foblex/flow';
+
+@Component({
+  standalone: true,
+  imports: [FFlowModule],
+  templateUrl: './flow.html',
+  styleUrl: './flow.scss',
+})
+export class Flow {}
+```
+
+```html
+<!-- template — the hierarchy f-flow > f-canvas > fNode/f-connection is mandatory -->
+<f-flow fDraggable>
+  <f-canvas>
+    <f-connection fSourceId="out-1" fTargetId="in-1"></f-connection>
+
+    <div fNode fDragHandle [fNodePosition]="{ x: 100, y: 100 }">
+      Node A
+      <div fConnector fConnectorType="source" fConnectorId="out-1"></div>
+    </div>
+    <div fNode fDragHandle [fNodePosition]="{ x: 320, y: 100 }">
+      Node B
+      <div fConnector fConnectorType="target" fConnectorId="in-1"></div>
+    </div>
+  </f-canvas>
+</f-flow>
+```
+
+```scss
+/* styles — f-flow must have a nonzero height or nothing is visible */
+f-flow {
+  display: block;
+  height: 600px;
+}
+```
+
+The default theme is wired by `ng add @foblex/flow` (adds `node_modules/@foblex/flow/styles/default.scss` to `angular.json`). Without a theme, nodes and connections render unstyled or invisible.
+
+## Verified Building Blocks
+
+- `<f-flow>`: root flow host.
+- `<f-canvas>`: canvas/viewport container.
+- `[fNode]` and `[fGroup]`: place nodes and groups in the template.
+- `[fConnector]` with `fConnectorId` and `fConnectorType` (`'source' | 'target' | 'source-target' | 'outlet'`): the **unified connector**. Preferred for new code.
+- `[fNodeOutput]` / `[fNodeInput]` / `[fNodeOutlet]`: legacy connectors, still supported, deprecated in favor of `fConnector`.
+- `<f-connection>` with `fSourceId` / `fTargetId`: render an existing connection between connectors (`fOutputId` / `fInputId` are deprecated aliases).
+- `<f-connection-for-create>`: optional preview connection used during drag-to-connect UX.
+- `fDraggable` on `<f-flow>`: enables pointer interactions and emits interaction events.
+- `fZoom` on `<f-canvas>`: opt-in wheel / double-click / pinch zoom.
+- `<f-selection-area>`: opt-in rectangle multi-select.
+- `provideFFlow(...)` with features: `withConnectionFlow('click')` (click-to-connect gesture alongside drag; custom gestures implement `IFConnectionFlow` and drive `FCreateConnectionSession`), `withControlScheme(...)` (gesture-to-action mapping, presets `F_DEFAULT_CONTROL_SCHEME`, `F_SCROLL_PAN_CONTROL_SCHEME`, `F_DRAG_SELECT_CONTROL_SCHEME`), `withReflowOnResize(...)` (auto layout on node resize), `withFCanvas(...)` (canvas defaults such as layer order), `withA11y(...)` (keyboard accessibility), and `withFlowState(...)` (managed records plus undo/redo).
+
+## Hard Rules
+
+- Never invent Inputs, Outputs, methods, directives, or selectors.
+- Do **not** assume React Flow style APIs such as `[nodes]`, `[edges]`, `setNodes()`, `addEdge()`, `useNodesState()`, `<Handle>`, `<Background>`, `<Controls>`, or similar patterns.
+- Do **not** assume managed state unless the component explicitly installs `provideFFlow(withFlowState())`. Without it, the app owns state and handles events.
+- Connections are connector-to-connector, not generic node-to-node edges.
+- Template connections use `fSourceId -> fTargetId` referencing `fConnectorId` values (legacy: `fOutputId -> fInputId` referencing output/input ids).
+- Do **not** interpret `[fNodes]` or `[fConnections]` as graph-state inputs. They are content-projection slot markers used with `ngProjectAs` (see the nested control flow rule below).
+- **Nested control flow requires `ngProjectAs`.** Nodes, groups, or connections rendered inside nested template blocks (`@for` in `@if`, `@for` in `@for`, `@if` in `@if`, or a wrapper element) are NOT projected into the canvas — Angular creates them detached, geometry collapses to 0×0, and nothing renders, with no error. Wrap such blocks:
+
+  ```html
+  @if (isEditable()) {
+    <ng-container ngProjectAs="[fNodes]">
+      @for (node of nodes(); track node.id) {
+        <div fNode [fNodePosition]="node.position">{{ node.label }}</div>
+      }
+    </ng-container>
+    <ng-container ngProjectAs="[fConnections]">
+      @for (c of connections(); track c.id) {
+        <f-connection [fSourceId]="c.source" [fTargetId]="c.target" />
+      }
+    </ng-container>
+  }
+  ```
+
+  Use `"[fNodes]"` for nodes, `"[fGroups]"` for groups, `"[fConnections]"` for connections. A single top-level `@for` / `@if` directly inside `<f-canvas>` needs no wrapper.
+
+- Examples may include app-specific layout logic, persistence, toolbars, or validation. Undo/redo is built in only when `withFlowState()` is installed; otherwise it remains application code.
+- Some exports are low-level, compatibility-oriented, or testing-oriented. Do not treat every export from `@foblex/flow` as the recommended app-facing API.
+- If a symbol, selector, event, or behavior is not confirmed in the installed package, say: `not found in @foblex/flow`.
+
+## Classic State Pattern
+
+- Render nodes and groups from your Angular state using normal Angular templates.
+- Put connectors on the node element itself or on child elements with `fConnector`.
+- Render persisted connections explicitly with `<f-connection>`.
+- Add `fDraggable` to `<f-flow>` when you want drag, selection, connect, reassign, or drop interactions.
+- Handle events such as `fCreateConnection`, `fReassignConnection`, `fMoveNodes`, `fSelectionChange`, `fCreateNode`, `fDropToGroup`, and `fConnectionWaypointsChanged`.
+- Update your own state in those handlers, then let Angular rerender.
+- Use node/group position bindings and change outputs to keep positions in app state when needed.
+
+## Managed State Pattern
+
+Install the state feature at the same component injector as `provideFFlow`, load plain records, and render its signals:
+
+```typescript
+interface EditorNode extends IFStateNode {
+  text: string;
+}
+
+@Component({
+  providers: [provideFFlow(withFlowState())],
+})
+export class Editor {
+  protected readonly state = injectFlowState<EditorNode>();
+
+  constructor() {
+    this.state.load({ nodes: [], groups: [], connections: [] });
+  }
+}
+```
+
+- Bind `state.nodes()`, `state.groups()` and `state.connections()` with `@for`; bind canvas `[position]` and `[scale]` to `state.transform()` when viewport undo/redo is enabled.
+- Supported v1 gestures: create/reassign connection, move nodes/groups, delete selection, external-item creation, optional drop-to-group, selection, and canvas pan/zoom.
+- Node and group geometry emitted through `fNodeSizeChange` / `fGroupSizeChange`, including user resize and auto-expand or auto-fit updates, changes the managed records without creating a separate history step. Arbitrary content measurement that emits neither output is not written to the store. Rotation and connection waypoint editing are not captured by managed state in v1.
+- `state.changes()` increments once when a standalone mutation or outer batch settles. A drag can emit selection at start and move/drop at end while remaining one history step and one `changes()` increment.
+- Use `state.snapshot()` for persistence; it includes graph records, selection, and viewport transform. `load()` restores them and resets history. Snapshots created before selection persistence remain valid and load with an empty selection.
+- `canvasTransformDebounce` defaults to `350ms`. It waits for wheel/pinch zoom events to settle, then records the current canvas transform as one change and one undo item. Setting it to `0` disables batching: every emitted `fCanvasChange` is applied immediately, increments `state.changes()`, and normally creates a separate undo item. Keep the canvas `[debounceTime]` unset when managed state owns viewport history; do not stack canvas and State debounce layers.
+- For initial or other application-driven viewport positioning, suppress the event at the canvas helper: `canvas.resetScaleAndCenter(false, false)`. The second `false` means `emitCanvasChange = false`, so managed history is untouched.
+- `canvas.centerGroupOrNode(id)` preserves the current zoom. Use `canvas.resetScaleAndCenterGroupOrNode(id)` when focusing the item must also reset zoom to `1`; both methods emit `fCanvasChange` by default.
+- Connection endpoints are connector ids. Automatic cascade from node/group deletion uses the rendered connector registry; before connectors render, remove known attached connection ids explicitly in the same `state.batch(...)`.
+
+### Async reflow must stay inside an open transaction
+
+When an application expands/collapses a node, its record changes synchronously but `withReflowOnResize()` emits the resulting `fMoveNodes` positions later, after Angular rendering and `ResizeObserver`. Do not use synchronous `state.batch(() => ...)` if both changes must be one undo item. Open the transaction before changing the record and close it only after reflow settles:
+
+```typescript
+state.beginBatch();
+
+try {
+  state.updateNode(nodeId, { isExpanded });
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+} finally {
+  state.endBatch();
+}
+```
+
+The state controller applies reflow's `fMoveNodes` event inside the open transaction. One `undo()` then restores both the expanded value and every moved position. Two frames fit an immediately rendered size change; for CSS transitions, lazy content, or longer asynchronous layout, close from the real completion signal. Always close in `finally`, because an unclosed batch merges unrelated future mutations into the same history entry.
+
+If the toggle is nested inside `fDragHandle`, add `fDragBlocker` to the toggle. Otherwise its pointer down can select the node first; with `selectionInHistory: true`, that selection is a separate intentional history item even though expand and reflow share one batch.
+
+## Common Silent Failures — Check These First
+
+When the flow compiles but looks wrong, verify in this order:
+
+1. **Connection not visible**: `fSourceId` / `fTargetId` does not match any rendered `fConnectorId` exactly. `out-1` vs `out_1` is a mismatch; numeric `1` and string `'1'` normalize to the same id. The connection does not render, and dev mode reports `FF1001` after endpoint resolution settles.
+2. **Blank canvas**: `f-flow` has zero height, or the theme SCSS is not wired in `angular.json`.
+3. **`'f-flow' is not a known element`** or connectors not working: `FFlowModule` missing from the component `imports`.
+4. **Nothing is draggable / no events fire**: `fDraggable` missing on `<f-flow>`.
+5. **Wheel does nothing**: `fZoom` missing on `<f-canvas>` (zoom is opt-in).
+6. **Node ignores position**: `[fNodePosition]` must be a property binding to `{ x, y }`, and nodes must be direct content of `<f-canvas>`.
+7. **`[f-flow][FF1003]` error**: a connector is placed outside an `[fNode]` / `[fGroup]` element.
+8. **Nodes/connections exist in state but nothing renders, no errors** (`FF1004` warns in dev mode): flow content sits inside nested `@if`/`@for` blocks without `<ng-container ngProjectAs="[fNodes]">` (`"[fGroups]"` / `"[fConnections]"`) — see the Hard Rules section.
+9. **Handles/selection/connect present but inert** (`FF1005`): `fDraggable` is missing on `<f-flow>` while `fDragHandle` / `f-selection-area` / `f-connection-for-create` / resize / rotate are used.
+10. **Connections attach to the wrong place** (`FF1006`): a connector is hidden with CSS (`display: none`) — its geometry is a 0×0 point. Conditionally render instead of hiding.
+11. **Node moves but its bindings never fire** (`FF1007`): an `fNode` element is nested inside another node element. One `fNode` per node; hierarchy is id-based (`fNodeParentId`), not DOM-based.
+12. **Group behaviors don't apply** (`FF1008`): `fNodeParentId` / `fGroupParentId` references an id no rendered group has.
+13. **Wrong initial viewport** (`FF1009`): `fitToScreen()` / `resetScaleAndCenter()` / `centerGroupOrNode()` / `resetScaleAndCenterGroupOrNode()` called before nodes were rendered — call them from `(fNodesRendered)` (earliest safe) or `(fFullRendered)`.
+14. **Drop connects to a connector you did not aim at** (`FF1010`): the connector element itself has no size — the visible dot is drawn with `::before`/`::after`. Give the connector element its own `width`/`height`; node-level drops (`fConnectOnNode`) attach to the connector closest to the drop point.
+15. **Minimap/fitToScreen/auto-layout place a node elsewhere than the canvas shows** (`FF1011`): app CSS on the node host (margin, left/top, an extra transform) moved the visuals while `fNodePosition` stayed put. Model-driven features read the model; fold the offset into `fNodePosition`.
+16. **Dragged node never raises above its siblings, `FF1012` warns** : the `fNode` sits inside a component's template, so the component host wraps it and the canvas cannot layer-sort it. Put the `fNode` directive on the component's host element in the canvas template.
+17. **Initial centering appears in managed undo history**: call `resetScaleAndCenter(false, false)` (or pass `emitCanvasChange: false` to another viewport helper) for an application-driven transform.
+
+To verify programmatically: wait for `(fFullRendered)`, compare the node, group, and connection ids exported by `flow.getState()` with the expected graph, and fail the test on any `FFxxxx` console diagnostic. `getState()` exports registered graph records; it does not by itself prove that connection endpoints resolved. Dev-mode `FF1001` reports an unresolved endpoint.
+
+## Additional Rules
+
+- The library runs outside the Angular zone: its events do not trigger change detection. With OnPush or zoneless apps, replace arrays/objects (new references) instead of mutating, and call `markForCheck()` where needed.
+- Always set stable, app-owned ids on nodes and connections; auto-generated ids (`f-connection-3`) cannot be mapped back to your model and break selection/persistence across re-renders.
+- Style flow internals (connection paths, minimap, markers) in global styles or via `::ng-deep` — component-scoped CSS never reaches them. Wire the default theme via `ng add`.
+- Do not combine `fAutoSizeToFitChildren` with restoring a persisted group size in the same render: pass `false` while restoring, enable it afterwards.
+- With several `<f-flow>` instances on one page, keep `fDraggable` enabled only on the active flow.
+- For custom markers, either provide `SELECTED_START` / `SELECTED_END` alongside `START` / `END`, or use `START_ALL_STATES` / `END_ALL_STATES`; the all-states variants create both normal and selected markers.
+- An empty `fCanBeConnectedTo` allow-list means "no restriction", not "allow nothing"; category strings must match exactly.
+- Start with regular `@for` rendering and measure a production build. Enable `[fCache]` when geometry reads are a demonstrated cost; use `*fVirtualFor` inside `<ng-container ngProjectAs="[fNodes]">` when progressive creation materially improves startup. `fVirtualFor` is not viewport culling.
+
+## Naming Distinction
+
+- In templates, connector ids are `fConnectorId` (unified) or legacy `fOutputId` / `fInputId`; connection endpoints are `fSourceId` / `fTargetId`.
+- In `FCreateConnectionEvent`, prefer `sourceId`, `targetId`, and `dropPosition`.
+- `FCreateConnectionEvent` still exposes legacy aliases `fOutputId`, `fInputId`, and `fDropPosition`.
+- In `FReassignConnectionEvent`, prefer `connectionId`, `endpoint`, `previousSourceId`, `nextSourceId`, `previousTargetId`, `nextTargetId`, and `dropPosition`.
+- `FReassignConnectionEvent` still exposes legacy aliases such as `oldSourceId`, `newSourceId`, `oldTargetId`, `newTargetId`, and `dropPoint`.
+- Other current event classes also prefer non-`f*` names when both versions exist, for example `nodeIds` over `fNodeIds` and `nodes` over `fNodes`.
+- Examples may still show compatibility names in handlers. Prefer the current non-deprecated event property names when generating new code.
+
+## Styling
+
+See [STYLING.md](./STYLING.md).
+
+## More Documentation
+
+- Full LLM-readable reference: https://flow.foblex.com/llms-full.txt
+- Docs index for agents: https://flow.foblex.com/llms.txt
+- Human docs: https://flow.foblex.com/docs/get-started
+- Live examples with source: https://flow.foblex.com/examples/overview
+- Managed state example and contract: https://flow.foblex.com/examples/state
+- Managed state guide: https://flow.foblex.com/docs/managed-flow-state
+- Managed state + asynchronous reflow recipe: https://flow.foblex.com/examples/state
+- Large-flow performance guide: https://flow.foblex.com/docs/large-flow-performance
+- Shadow DOM and Angular Elements: https://flow.foblex.com/docs/shadow-dom-and-angular-elements
+- Unified connector migration: https://flow.foblex.com/docs/migrating-to-unified-connectors
+
+## Fallback Rule
+
+If something cannot be verified from the installed package, answer with: `not found in @foblex/flow`.

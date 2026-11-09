@@ -1,0 +1,32 @@
+@use '@foblex/flow/styles' as flow-theme;
+
+::ng-deep {
+  @include flow-theme.theme-tokens();
+}
+
+::ng-deep f-flow {
+  @include flow-theme.connection($scoped: false);
+  .f-connection {
+    .f-connection-selection {
+      stroke-width: 20;
+    }
+
+    .f-connection-path {
+      stroke-width: 6;
+    }
+
+    &:not(.gradient-color) {
+      .f-connection-path {
+        stroke: #db2777;
+      }
+    }
+
+    &:hover {
+      .f-connection-selection {
+        stroke: var(--ff-node-border-color);
+      }
+    }
+  }
+}
+
+@include flow-theme.node($selectorless: false);

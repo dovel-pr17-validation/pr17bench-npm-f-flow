@@ -1,0 +1,115 @@
+import { inject, Injectable } from '@angular/core';
+import { RotateNodePreparationRequest } from './rotate-node-preparation-request';
+import { IPoint, ITransformModel, Point } from '../../../_libs/f-2d';
+import { FMediator, IExecution } from '../../../_libs/f-mediator';
+import { FComponentsStore } from '../../../f-storage';
+import { FDraggableDataContext } from '../../f-draggable-data-context';
+import {
+  CalculateInputConnectionsRequest,
+  CalculateOutputConnectionsRequest,
+  GetConnectorRectReferenceRequest,
+  isValidEventTrigger,
+  SelectAndUpdateNodeLayerRequest,
+} from '../../../domain';
+import { findNodeOrGroupContaining, FNodeBase, isRotateHandle } from '../../../f-node';
+import { requireSourceConnector, requireTargetConnector } from '../../../f-connectors';
+import { RotateNodeHandler } from '../rotate-node-handler';
+import { DragHandlerInjector } from '../../infrastructure';
+import {
+  DragNodeConnectionHandlerBase,
+  DragNodeConnectionSourceHandler,
+  DragNodeConnectionTargetHandler,
+} from '../../drag-node';
+
+type TRotateConnectionHandler = {
+  connection: DragNodeConnectionHandlerBase;
+  connector: IPoint;
+};
+
+@Injectable()
+export class RotateNodePreparation implements IExecution<RotateNodePreparationRequest, void> {
+  private readonly _mediator = inject(FMediator);
+  private readonly _store = inject(FComponentsStore);
+  private readonly _dragContext = inject(FDraggableDataContext);
+  private readonly _dragInjector = inject(DragHandlerInjector);
+
+  private get _transform(): ITransformModel {
+    return this._store.transform;
+  }
+
+  public handle(request: RotateNodePreparationRequest): void {
+    if (!this._isPreparationAllowed(request)) {
+      return;
+    }
+
+    const nodeOrGroup = this._findRotatableNode(request.event.targetElement);
+    if (!nodeOrGroup) {
+      return;
+    }
+
+    this._selectBeforeRotate(nodeOrGroup);
+
+    const scale = this._transform.scale;
+    this._dragContext.onPointerDownScale = scale;
+    this._dragContext.onPointerDownPosition = Point.fromPoint(request.event.getPosition())
+      .elementTransform(this._store.flowHost)
+      .div(scale);
+
+    const handler = this._dragInjector.createInstance(RotateNodeHandler);
+    handler.initialize(
+      nodeOrGroup,
+      this._buildOutputConnectionHandlers(nodeOrGroup),
+      this._buildInputConnectionHandlers(nodeOrGroup),
+    );
+
+    this._dragContext.draggableItems = [handler];
+  }
+
+  private _isPreparationAllowed({ event, fTrigger }: RotateNodePreparationRequest): boolean {
+    return (
+      this._dragContext.isEmpty() &&
+      isRotateHandle(event.targetElement) &&
+      isValidEventTrigger(event.originalEvent, fTrigger)
+    );
+  }
+
+  private _findRotatableNode(target: HTMLElement): FNodeBase | undefined {
+    const node = findNodeOrGroupContaining(this._store, target);
+
+    return node && !node.fDraggingDisabled() ? node : undefined;
+  }
+
+  private _selectBeforeRotate(node: FNodeBase): void {
+    queueMicrotask(() => {
+      this._mediator.execute<void>(new SelectAndUpdateNodeLayerRequest(node));
+    });
+  }
+
+  private _buildInputConnectionHandlers(nodeOrGroup: FNodeBase): TRotateConnectionHandler[] {
+    return this._mediator.execute(new CalculateInputConnectionsRequest(nodeOrGroup)).map((x) => {
+      const connector = requireTargetConnector(this._store, x.targetId());
+      const connectorRef = this._mediator.execute(new GetConnectorRectReferenceRequest(connector));
+      const handler = this._dragInjector.get(DragNodeConnectionTargetHandler);
+      handler.initialize(x);
+
+      return {
+        connection: handler,
+        connector: connectorRef.rect.gravityCenter,
+      };
+    });
+  }
+
+  private _buildOutputConnectionHandlers(nodeOrGroup: FNodeBase): TRotateConnectionHandler[] {
+    return this._mediator.execute(new CalculateOutputConnectionsRequest(nodeOrGroup)).map((x) => {
+      const connector = requireSourceConnector(this._store, x.sourceId());
+      const connectorRef = this._mediator.execute(new GetConnectorRectReferenceRequest(connector));
+      const handler = this._dragInjector.get(DragNodeConnectionSourceHandler);
+      handler.initialize(x);
+
+      return {
+        connection: handler,
+        connector: connectorRef.rect.gravityCenter,
+      };
+    });
+  }
+}

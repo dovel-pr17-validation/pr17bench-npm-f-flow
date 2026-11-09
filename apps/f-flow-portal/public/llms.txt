@@ -1,0 +1,109 @@
+# Foblex Flow
+
+> The most adopted node editor library for Angular (by npm weekly downloads) — Angular-native, for production workflow builders, AI pipelines, and interactive diagram editors. MIT licensed.
+
+## Key facts
+
+- Package: `@foblex/flow` on npm — https://www.npmjs.com/package/@foblex/flow
+- Current version: v19.4.0 (see the npm page for the live number)
+- Usage metrics: see the npm page for current download data
+- GitHub: https://github.com/Foblex/f-flow
+- License: MIT
+- Supports: Angular 17.3+ (older 12–17.2 lines pinned separately)
+- Built for: Angular teams. Not a React wrapper. Not framework-agnostic.
+- Adoption: the most widely used node editor library built for Angular, by npm weekly downloads; in production at Luware Nimbus, ProcessMIX, XpertAI, and EpicStaff
+- State integration: classic app-owned records by default, or opt-in `withFlowState()` managed records; domain validation and persistence remain application-owned
+
+## Documentation
+
+- [Introduction](https://flow.foblex.com/docs/intro): What Foblex Flow is, who it's for, core primitives
+- [Get Started](https://flow.foblex.com/docs/get-started): Install and render your first flow in 5 minutes
+- [Angular Version Compatibility](https://flow.foblex.com/docs/angular-version-compatibility)
+- [React Flow vs Foblex Flow](https://flow.foblex.com/docs/react-flow-vs-foblex-flow-for-angular-teams): Honest comparison for Angular teams
+- [ngx-vflow vs Foblex Flow](https://flow.foblex.com/docs/ngx-vflow-vs-foblex-flow): Honest comparison of the two Angular-native node editor libraries
+- [Roadmap](https://flow.foblex.com/docs/roadmap): Planned features and release timeline
+- [Errors and Warnings](https://flow.foblex.com/docs/errors): FFxxxx diagnostic codes with causes and fixes
+- [AI Agents](https://flow.foblex.com/docs/ai): Setting up LLMs and coding agents (AGENTS.md, bundled AI.md, llms.txt, Context7)
+- [Managed Flow State](https://flow.foblex.com/docs/managed-flow-state): Choosing classic app-owned records or opt-in typed state, snapshots, batching, and undo/redo
+- [Large Flow Performance](https://flow.foblex.com/docs/large-flow-performance): Cache, virtualization, workers, minimap limits, and measurement guidance
+- [Shadow DOM and Angular Elements](https://flow.foblex.com/docs/shadow-dom-and-angular-elements): Embedding flows in open shadow roots and custom elements
+- [Migrating to Unified Connectors](https://flow.foblex.com/docs/migrating-to-unified-connectors): Replace deprecated input/output connector aliases with fConnector and source/target endpoint ids
+
+## API Reference
+
+- [f-flow Component](https://flow.foblex.com/docs/f-flow-component): Root container, flow state, selection, redraw
+- [f-canvas Component](https://flow.foblex.com/docs/f-canvas-component): Viewport, pan/zoom, fitToScreen, centering
+- [fNode Directive](https://flow.foblex.com/docs/f-node-directive): Draggable nodes, position, size, rotation
+- [fGroup Directive](https://flow.foblex.com/docs/f-group-directive): Node grouping, hierarchy, auto-sizing
+- [fConnector Directive](https://flow.foblex.com/docs/f-connector-directive): Unified connector (source/target/source-target/outlet), replaces fNodeOutput/fNodeInput/fNodeOutlet
+- [fNodeOutput Directive](https://flow.foblex.com/docs/f-node-output-directive): Output connectors, connection rules (deprecated — use fConnector)
+- [fNodeInput Directive](https://flow.foblex.com/docs/f-node-input-directive): Input connectors, categories, multiplicity (deprecated — use fConnector)
+- [fNodeOutlet Directive](https://flow.foblex.com/docs/f-node-outlet-directive): Shared outlet connectors (deprecated — use fConnector)
+- [f-connection Component](https://flow.foblex.com/docs/f-connection-component): Connection rendering, types, behavior
+- [f-connection-for-create](https://flow.foblex.com/docs/f-connection-for-create-component): Drag-to-connect preview
+- [f-snap-connection](https://flow.foblex.com/docs/f-snap-connection-component): Snap helper during connection drag
+- [f-connection-waypoints](https://flow.foblex.com/docs/f-connection-waypoints-component): Editable bend points
+- [Connection Markers](https://flow.foblex.com/docs/f-connection-marker-directive): Arrow, circle, and custom SVG markers
+- [fDraggable Directive](https://flow.foblex.com/docs/f-draggable-directive): All pointer interactions, events, triggers
+- [fDragHandle Directive](https://flow.foblex.com/docs/f-drag-handle-directive): Drag-start surface
+- [fResizeHandle Directive](https://flow.foblex.com/docs/f-resize-handle-directive): Resize handles with directions
+- [fRotateHandle Directive](https://flow.foblex.com/docs/f-rotate-handle-directive): Rotation handles
+- [fZoom Directive](https://flow.foblex.com/docs/f-zoom-directive): Wheel, pinch, and double-click zoom
+- [f-minimap Component](https://flow.foblex.com/docs/f-minimap-component): Overview navigator
+- [f-background Component](https://flow.foblex.com/docs/f-background-component): Canvas background patterns
+- [f-selection-area](https://flow.foblex.com/docs/f-selection-area-component): Rectangle multi-select
+- [Control Scheme](https://flow.foblex.com/docs/control-scheme): Configurable gesture-to-action mapping with presets
+- [Accessibility](https://flow.foblex.com/docs/accessibility): ARIA semantics always on; withA11y() adds keyboard navigation, movement, and connection creation
+- [fExternalItem Directive](https://flow.foblex.com/docs/f-external-item-directive): Drag from palette to canvas
+- [f-auto-pan Component](https://flow.foblex.com/docs/f-auto-pan-component): Edge-based auto-scroll
+- [f-magnetic-lines](https://flow.foblex.com/docs/f-magnetic-lines-component): Alignment guide lines
+- [f-magnetic-rects](https://flow.foblex.com/docs/f-magnetic-rects-component): Equal-spacing helpers (Figma-like) for node layout
+- [f-line-alignment](https://flow.foblex.com/docs/f-line-alignment-component): Legacy alignment helper (deprecated - use f-magnetic-lines)
+- [Connection Rules](https://flow.foblex.com/docs/connection-rules): Restricting valid connections
+- [Event System](https://flow.foblex.com/docs/event-system): Final-result events, triggers, CSS state classes
+- [Selection System](https://flow.foblex.com/docs/selection-system): Pointer, box and programmatic selection
+
+## Styling
+
+- [Default Theme and Styling](https://flow.foblex.com/docs/default-theme-and-styling): Theme setup, installation
+- [Styling Tokens and Overrides](https://flow.foblex.com/docs/styling-tokens-and-overrides): CSS custom properties (`--ff-*`)
+- [Styling Mixins and Scoping](https://flow.foblex.com/docs/styling-mixins-and-scoping): SCSS mixins API
+- [Styling Recipes](https://flow.foblex.com/docs/styling-recipes): Common styling patterns
+
+## Use cases
+
+- [Angular Node-Based UI Library](https://flow.foblex.com/docs/angular-node-based-ui-library)
+- [Angular Flowchart Library](https://flow.foblex.com/docs/angular-flowchart-library): Editable flowcharts with draggable steps and wired connections
+- [Angular AI Agent Builder](https://flow.foblex.com/docs/angular-ai-agent-builder): Visual AI pipelines and low-code LLM tools on Foblex Flow
+- [React Flow Alternative for Angular](https://flow.foblex.com/docs/react-flow-alternative-for-angular): How the nodes/edges model maps to Angular-native templates
+- [ngx-graph Alternative](https://flow.foblex.com/docs/ngx-graph-alternative): Migration from ngx-graph visualization to an editable Angular node editor
+- [Angular Node Editor Library](https://flow.foblex.com/docs/angular-node-editor-library)
+- [Angular Workflow Builder](https://flow.foblex.com/docs/angular-workflow-builder)
+- [Angular Diagram Library](https://flow.foblex.com/docs/angular-diagram-library)
+
+## Examples
+
+- [Click to Connect](https://flow.foblex.com/examples/click-to-connect): Click source, then target — withConnectionFlow('click')
+- [Accessibility](https://flow.foblex.com/examples/accessibility): Keyboard-operable editor with screen-reader announcements — opt-in via withA11y()
+- [Initial View](https://flow.foblex.com/examples/initial-view): Reveal the flow already fitted/centered on first paint — fInitialView input or withInitialView()
+- [Managed Flow State](https://flow.foblex.com/examples/state): Optional `withFlowState()` store with typed records, automatic gesture updates, batching, undo/redo, snapshots, and an async reflow transaction recipe
+
+- [All Examples Overview](https://flow.foblex.com/examples/overview): 50+ interactive examples
+- [AI Low-Code Platform](https://flow.foblex.com/examples/ai-low-code-platform): Reference app
+- [Schema Designer](https://flow.foblex.com/examples/schema-designer)
+- [Call Center Flow](https://flow.foblex.com/examples/call-center)
+- [UML Diagram](https://flow.foblex.com/examples/uml-diagram-example)
+
+## Full reference
+
+- [llms-full.txt](https://flow.foblex.com/llms-full.txt): Full curated reference covering core app-facing inputs, outputs, methods, types, code examples, and styling guidance
+
+## Services
+
+- [Consulting & custom development](https://flow.foblex.com/services): Architecture review from $1,500, prototype sprints $5–15K, full partnerships $25K+
+
+## Optional
+
+- [Changelog](https://github.com/Foblex/f-flow/blob/main/CHANGELOG.md)
+- [Blog](https://flow.foblex.com/blog/overview)
+- [Showcase](https://flow.foblex.com/showcase/overview)

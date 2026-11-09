@@ -1,0 +1,30 @@
+import { IRoundedRect } from '../../../../../_libs/f-2d';
+import { inject, Injectable } from '@angular/core';
+import { FMediator, IExecution } from '../../../../../_libs/f-mediator';
+import { GetNormalizedConnectorRectRequest } from '../../../../get-normalized-connector-rect';
+import { FConnectorBase } from '../../../../../f-connectors';
+import { ResolveConnectionEndpointRectRequest } from './resolve-connection-endpoint-rect-request';
+
+@Injectable()
+export class ResolveConnectionEndpointRect implements IExecution<
+  ResolveConnectionEndpointRectRequest,
+  IRoundedRect
+> {
+  private readonly _mediator = inject(FMediator);
+
+  public handle({ connector, cache }: ResolveConnectionEndpointRectRequest): IRoundedRect {
+    const cacheKey = this._buildCacheKey(connector);
+    const rect = cache.get(cacheKey) ?? this._calculateRect(connector);
+    cache.set(cacheKey, rect);
+
+    return rect;
+  }
+
+  private _buildCacheKey(connector: FConnectorBase): string {
+    return `${connector.kind}::${connector.fId()}`;
+  }
+
+  private _calculateRect(connector: FConnectorBase): IRoundedRect {
+    return this._mediator.execute(new GetNormalizedConnectorRectRequest(connector.hostElement));
+  }
+}

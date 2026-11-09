@@ -1,0 +1,78 @@
+import {
+  booleanAttribute,
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  Injector,
+  input,
+  model,
+  numberAttribute,
+  OnDestroy,
+  OnInit,
+  untracked,
+  ViewEncapsulation,
+} from '@angular/core';
+import { F_CONNECTION_WAYPOINTS, FConnectionWaypointsBase } from './models';
+import { IPoint } from '../../../_libs/f-2d';
+import { EmitConnectionsChangesRequest } from '../../../f-storage';
+import { FMediator } from '../../../_libs/f-mediator';
+import { F_CONNECTION_COMPONENTS_PARENT } from '../../models';
+import { RemoveConnectionWaypointRequest } from '../../../domain';
+
+@Component({
+  selector: 'f-connection-waypoints',
+  templateUrl: './f-connection-waypoints.html',
+  styleUrls: ['./f-connection-waypoints.scss'],
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'f-component f-connection-waypoints',
+  },
+  providers: [{ provide: F_CONNECTION_WAYPOINTS, useExisting: FConnectionWaypoints }],
+  encapsulation: ViewEncapsulation.None,
+})
+export class FConnectionWaypoints extends FConnectionWaypointsBase implements OnInit, OnDestroy {
+  private readonly _mediator = inject(FMediator);
+  private readonly _injector = inject(Injector);
+  private readonly _connection = inject(F_CONNECTION_COMPONENTS_PARENT);
+
+  public override readonly radius = input(4, {
+    transform: numberAttribute,
+  });
+  public override readonly waypoints = model<IPoint[]>([]);
+
+  public override readonly visibility = input(true, {
+    transform: booleanAttribute,
+  });
+
+  public ngOnInit(): void {
+    this._listenChanges();
+  }
+
+  private _listenChanges(): void {
+    effect(
+      () => {
+        this.radius();
+        this.waypoints();
+        this.visibility();
+        untracked(() => this._notifyDataChanged());
+      },
+      { injector: this._injector },
+    );
+  }
+
+  private _notifyDataChanged(): void {
+    this._mediator.execute(new EmitConnectionsChangesRequest());
+  }
+
+  protected remove(index: number, event: MouseEvent): void {
+    this._mediator.execute(new RemoveConnectionWaypointRequest(index, this._connection.fId()));
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  public ngOnDestroy(): void {
+    this._notifyDataChanged();
+  }
+}

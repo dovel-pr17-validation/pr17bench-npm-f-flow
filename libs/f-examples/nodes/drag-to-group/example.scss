@@ -1,0 +1,10 @@
+@use '@foblex/flow/styles' as flow-theme;
+
+::ng-deep {
+  @include flow-theme.theme-tokens();
+  @include flow-theme.flow($scoped: true);
+}
+
+@include flow-theme.external-item-all($scoped: false);
+@include flow-theme.node-group($scoped: false);
+@include flow-theme.grouping($scoped: false);

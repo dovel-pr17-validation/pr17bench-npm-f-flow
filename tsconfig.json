@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./apps/f-flow-portal/tsconfig.app.json"
+    },
+    {
+      "path": "./libs/f-flow/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/f-flow/tsconfig.spec.json"
+    },
+    {
+      "path": "./libs/f-layout/dagre/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/f-layout/elk/tsconfig.lib.json"
+    }
+  ]
+}

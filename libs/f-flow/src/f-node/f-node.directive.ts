@@ -1,0 +1,158 @@
+import {
+  AfterViewInit,
+  booleanAttribute,
+  DestroyRef,
+  Directive,
+  ElementRef,
+  inject,
+  input,
+  model,
+  OnDestroy,
+  OnInit,
+  output,
+} from '@angular/core';
+import { IRect, ISize, PointExtensions } from '../_libs/f-2d';
+import { NotifyTransformChangedRequest } from '../f-storage';
+import { F_NODE, FNodeBase } from './f-node-base';
+import { IHasHostElement } from '../i-has-host-element';
+import {
+  AddNodeToStoreRequest,
+  UpdateNodeWhenStateOrSizeChangedRequest,
+  RemoveNodeFromStoreRequest,
+  ConnectableSidesScheduler,
+} from '../domain';
+import { stringAttribute } from '../utils';
+import { FMediator } from '../_libs/f-mediator';
+
+let uniqueId = 0;
+
+@Directive({
+  standalone: false,
+  selector: '[fNode]',
+  exportAs: 'fComponent',
+  host: {
+    '[attr.data-f-node-id]': 'fId()',
+    '[attr.data-f-node-parent-id]': 'fParentId()',
+    class: 'f-node f-component',
+    '[class.f-node-dragging-disabled]': 'fDraggingDisabled()',
+    '[class.f-node-selection-disabled]': 'fSelectionDisabled()',
+  },
+  providers: [{ provide: F_NODE, useExisting: FNodeDirective }],
+})
+export class FNodeDirective
+  extends FNodeBase
+  implements OnInit, AfterViewInit, IHasHostElement, OnDestroy
+{
+  private readonly _destroyRef = inject(DestroyRef);
+  private readonly _mediator = inject(FMediator);
+  private readonly _sidesScheduler = inject(ConnectableSidesScheduler);
+
+  public override readonly fId = input<string, unknown>(`f-node-${uniqueId++}`, {
+    alias: 'fNodeId',
+    transform: (value) => stringAttribute(value) || `f-node-${uniqueId++}`,
+  });
+
+  public override readonly fParentId = input<string | null | undefined>(null, {
+    alias: 'fNodeParentId',
+  });
+
+  public override readonly position = model(PointExtensions.initialize(), {
+    alias: 'fNodePosition',
+  });
+
+  public override readonly size = input<ISize | undefined>(undefined, {
+    alias: 'fNodeSize',
+  });
+
+  public override sizeChange = output<IRect>({ alias: 'fNodeSizeChange' });
+
+  public override readonly rotate = model(0, {
+    alias: 'fNodeRotate',
+  });
+
+  public override readonly fConnectOnNode = input(true, {
+    transform: booleanAttribute,
+  });
+
+  public override readonly fMinimapClass = input<string[] | string>([]);
+
+  public override readonly fDraggingDisabled = input(false, {
+    alias: 'fNodeDraggingDisabled',
+    transform: booleanAttribute,
+  });
+
+  public override readonly fSelectionDisabled = input(false, {
+    alias: 'fNodeSelectionDisabled',
+    transform: booleanAttribute,
+  });
+
+  public override readonly fIncludePadding = input(true, {
+    transform: booleanAttribute,
+  });
+
+  public override readonly fAutoExpandOnChildHit = input(false, {
+    transform: booleanAttribute,
+  });
+
+  public override readonly fAutoSizeToFitChildren = input(false, {
+    transform: booleanAttribute,
+  });
+
+  constructor(
+    // eslint-disable-next-line @angular-eslint/prefer-inject
+    elementReference: ElementRef<HTMLElement>,
+  ) {
+    super(elementReference.nativeElement);
+    super.positionChanges();
+    super.sizeChanges();
+    super.rotateChanges();
+    super.parentChanges();
+  }
+
+  public ngOnInit(): void {
+    super.redraw();
+
+    this._mediator.execute(new AddNodeToStoreRequest(this));
+  }
+
+  protected override setStyle(styleName: string, value: string) {
+    this.renderer.setStyle(this.hostElement, styleName, value);
+  }
+
+  protected override removeStyle(styleName: string) {
+    this.renderer.removeStyle(this.hostElement, styleName);
+  }
+
+  public override redraw(): void {
+    super.redraw();
+    this._mediator.execute(new NotifyTransformChangedRequest());
+    this._updateConnectorsSides();
+  }
+
+  protected _updateConnectorsSides(): void {
+    if (!this.connectors.length) {
+      return;
+    }
+
+    this._sidesScheduler.schedule(this);
+  }
+
+  public ngAfterViewInit(): void {
+    if (!this.browser.isBrowser()) {
+      return;
+    }
+    this._listenStateSizeChanges();
+  }
+
+  private _listenStateSizeChanges(): void {
+    this._mediator.execute(new UpdateNodeWhenStateOrSizeChangedRequest(this, this._destroyRef));
+  }
+
+  public override refresh(): void {
+    this.stateChanges.notify();
+  }
+
+  public ngOnDestroy(): void {
+    this._mediator.execute(new RemoveNodeFromStoreRequest(this));
+  }
+}

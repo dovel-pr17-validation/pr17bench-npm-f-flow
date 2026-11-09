@@ -1,0 +1,57 @@
+<f-flow
+  fInitialView
+  fDraggable
+  (fFullRendered)="onLoaded()"
+  (fDragStarted)="onDragStarted($event)"
+  (fDragEnded)="onDragEnded()"
+  (fCreateConnection)="onConnectionCreated($event)"
+  (fReassignConnection)="onConnectionReassigned($event)"
+>
+  <f-canvas fZoom>
+    <f-connection-for-create fBehavior="fixed" fType="segment">
+      <f-connection-marker-arrow />
+    </f-connection-for-create>
+    @for (connection of connections; track connection.id) {
+    <f-connection
+      [fConnectionId]="connection.id"
+      [fOutputId]="connection.source"
+      [fInputId]="connection.target"
+      fBehavior="fixed"
+      fType="segment"
+    >
+      <f-connection-marker-arrow />
+    </f-connection>
+    } @for (node of nodes; track node.id; let index = $index) {
+    <div fNode [fNodePosition]="node.position" fDragHandle fConnectOnNode="false">
+      {{ node.text }}
+      <div
+        fNodeInput
+        fInputId="{{node.id}}-input-{{index}}"
+        fInputConnectableSide="left"
+        class="left"
+      ></div>
+      <div
+        fNodeOutput
+        fOutputId="{{node.id}}-output-{{index}}"
+        [isSelfConnectable]="false"
+        fOutputConnectableSide="top"
+        class="top"
+      ></div>
+      <div
+        fNodeInput
+        fInputId="{{node.id}}-input-{{index+1}}"
+        fInputConnectableSide="right"
+        class="right"
+      ></div>
+      <div
+        fNodeOutput
+        fOutputId="{{node.id}}-output-{{index+1}}"
+        [isSelfConnectable]="false"
+        fOutputConnectableSide="bottom"
+        class="bottom"
+      ></div>
+    </div>
+    }
+  </f-canvas>
+</f-flow>
+<f-events-panel title="Drag &amp; connection events" alignTop [events]="events()" />

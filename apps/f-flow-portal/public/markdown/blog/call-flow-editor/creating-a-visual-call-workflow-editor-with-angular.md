@@ -1,0 +1,274 @@
+---
+origin: "https://javascript.plainenglish.io/creating-a-visual-call-workflow-editor-with-angular-eb89d08815ff"
+originLabel: "Originally published on JavaScript in Plain English"
+publishedAt: "2024-03-28"
+updatedAt: "2026-07-28"
+---
+
+# Creating a Visual Call Workflow Editor with Angular
+
+In this tutorial, we build a visual call-flow editor in Angular using `@foblex/flow`. It is a useful reference if you want to turn the library into a domain-specific workflow builder instead of a generic diagram.
+
+### Create project and install dependencies
+
+```bash
+ng new call-workflow-editor
+cd call-workflow-editor
+ng add @foblex/flow
+```
+
+For Nx workspaces, use:
+
+```bash
+nx g @foblex/flow:add
+```
+
+If you prefer manual installation:
+
+```bash
+npm install @foblex/flow
+```
+
+### Defining models
+
+To manage workflow elements, define base models:
+
+```ts
+export interface IFlowModel {
+  nodes: INodeModel[];
+  connections: IConnectionModel[];
+}
+
+export interface INodeModel {
+  key: string;
+  name: string;
+  outputs: string[];
+  input?: string;
+  position: { x: number; y: number };
+  type: ENodeType;
+}
+
+export interface IConnectionModel {
+  key: string;
+  from: string;
+  to: string;
+}
+```
+
+### Workflow elements configuration
+
+We define node types and a node metadata map (name, icon, color, outputs):
+
+```ts
+export enum ENodeType {
+  IncomingCall = 'incoming-call',
+  PlayText = 'play-text',
+  UserInput = 'user-input',
+  ToOperator = 'to-operator',
+  Disconnect = 'disconnect',
+}
+
+export const NODE_MAP = {
+  [ENodeType.IncomingCall]: {
+    name: 'Incoming call',
+    icon: 'add_call',
+    color: '#39b372',
+    outputs: 1,
+  },
+  [ENodeType.UserInput]: {
+    name: 'User Input',
+    icon: 'call_log',
+    color: '#2676ff',
+    outputs: 3,
+  },
+  [ENodeType.PlayText]: {
+    name: 'Play text',
+    icon: 'wifi_calling_3',
+    color: '#AF94FF',
+    outputs: 1,
+  },
+  [ENodeType.ToOperator]: {
+    name: 'To operator',
+    icon: 'wifi_calling_3',
+    color: '#ffb62a',
+    outputs: 1,
+  },
+  [ENodeType.Disconnect]: {
+    name: 'Disconnect',
+    icon: 'phone_disabled',
+    color: '#ff859b',
+    outputs: 0,
+  },
+};
+```
+
+### Editor component
+
+Generate the editor component:
+
+```bash
+ng generate component workflow-editor
+```
+
+Then initialize basic editor state:
+
+```ts
+@Component({
+  selector: 'workflow-editor',
+  templateUrl: './workflow-editor.component.html',
+  styleUrls: ['./workflow-editor.component.scss'],
+})
+export class WorkflowEditorComponent {
+  public flow: IFlowModel = { nodes: [], connections: [] };
+  public eConnectableSide = EFConnectableSide;
+  public cBehavior: EFConnectionBehavior = EFConnectionBehavior.FIXED;
+  public cType: EFConnectionType = EFConnectionType.SEGMENT;
+}
+```
+
+### Flow visualization
+
+Render connections and nodes inside `f-flow` / `f-canvas`:
+
+```html
+@if (flow) {
+  <f-flow fDraggable>
+    <f-canvas fZoom>
+      @for (connection of flow.connections; track connection.key) {
+        <f-connection
+          [fConnectionId]="connection.key"
+          [fBehavior]="cBehavior"
+          [fType]="cType"
+          [fSourceId]="connection.from"
+          [fTargetId]="connection.to"
+        ></f-connection>
+      }
+
+      @for (node of flow.nodes; track node.key) {
+        <div fNode [fNodePosition]="node.position">
+          @if (node.input; as input) {
+            <div
+              fConnector
+              fConnectorType="target"
+              [fConnectorId]="input"
+              [fConnectorConnectableSide]="eConnectableSide.TOP"
+            ></div>
+          }
+
+          <div>{{ node.name }}</div>
+
+          @for (output of node.outputs; track output) {
+            <div
+              fConnector
+              fConnectorType="source"
+              [fConnectorId]="output"
+              [fConnectorConnectableSide]="eConnectableSide.BOTTOM"
+            ></div>
+          }
+        </div>
+      }
+    </f-canvas>
+  </f-flow>
+}
+```
+
+### Adding new nodes
+
+Prepare draggable node templates and handle node creation:
+
+```ts
+public possibleNodes = Object.keys(NODE_MAP).map((key: string) => ({
+  ...NODE_MAP[key],
+  type: key,
+}));
+
+public onCreateNode(event: FCreateNodeEvent): void {
+  const outputsCount = NODE_MAP[event.data].outputs;
+  const outputs = Array.from({ length: outputsCount }).map(() => this.generateId());
+
+  this.flow.nodes.push({
+    key: this.generateId(),
+    name: NODE_MAP[event.data].name,
+    outputs,
+    position: event.dropPosition ?? event.externalItemRect,
+    type: event.data,
+  });
+}
+
+private generateId(): string {
+  return `${Math.random().toString(36).substr(2, 9)}`;
+}
+```
+
+`dropPosition` is optional. When it is unavailable, `externalItemRect` provides the dragged item’s flow-space coordinates.
+
+```html
+@for (item of possibleNodes; track item) {
+  <button fExternalItem [style.color]="item.color" [fData]="item.type">
+    {{ item.icon }}
+  </button>
+}
+
+@if (flow) {
+  <f-flow (fCreateNode)="onCreateNode($event)">
+    ...flow content
+  </f-flow>
+}
+```
+
+### Editing connections
+
+Enable connection creation/reassignment and process events:
+
+```html
+<f-flow
+  (fCreateConnection)="onCreateConnection($event)"
+  (fReassignConnection)="onReassignConnection($event)"
+>
+  <f-canvas fZoom>
+    <f-connection-for-create></f-connection-for-create>
+    ...flow content
+  </f-canvas>
+</f-flow>
+```
+
+```ts
+public onCreateConnection(event: FCreateConnectionEvent): void {
+  if (!event.targetId) {
+    return;
+  }
+
+  const connection: IConnectionModel = {
+    key: this.generateId(),
+    from: event.sourceId,
+    to: event.targetId,
+  };
+
+  this.flow.connections.push(connection);
+}
+
+public onReassignConnection(event: FReassignConnectionEvent): void {
+  const connection = this.flow.connections.find(
+    (item) => item.key === event.connectionId,
+  );
+
+  if (!connection) {
+    return;
+  }
+
+  if (event.endpoint === 'source') {
+    if (event.nextSourceId) {
+      connection.from = event.nextSourceId;
+    }
+    return;
+  }
+
+  if (event.nextTargetId) {
+    connection.to = event.nextTargetId;
+  }
+}
+```
+
+`previousSourceId` and `previousTargetId` contain the endpoints before reassignment. The corresponding `nextSourceId` or `nextTargetId` can be `undefined` when the endpoint is dropped on the canvas; `dropPosition` contains that canvas position. For connection creation, the same case is represented by an undefined `targetId` together with `dropPosition`.
+
+This gives users a flexible way to build and modify call routing logic visually.

@@ -1,0 +1,26 @@
+import { inject, Injectable } from '@angular/core';
+import { IExecution } from '../../../../../_libs/f-mediator';
+import { FComponentsStore } from '../../../../../f-storage';
+import { ConnectionRedrawState, IConnectionRedrawSession } from '../../models';
+import { StartConnectionRedrawRequest } from './start-connection-redraw-request';
+
+@Injectable()
+export class StartConnectionRedraw implements IExecution<
+  StartConnectionRedrawRequest,
+  IConnectionRedrawSession
+> {
+  private readonly _store = inject(FComponentsStore);
+  private readonly _state = inject(ConnectionRedrawState);
+
+  public handle({ resetConnectedState }: StartConnectionRedrawRequest): IConnectionRedrawSession {
+    if (resetConnectedState) {
+      this._state.resetConnectedConnectors();
+    }
+
+    return {
+      renderTicket: this._state.beginRender(),
+      connectionsRevision: this._store.connectionsRevision,
+      nodesRevision: this._store.nodesRevision,
+    };
+  }
+}
